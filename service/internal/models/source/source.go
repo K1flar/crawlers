@@ -9,6 +9,7 @@ const (
 
 type Source struct {
 	ID     int64
+	Title  string
 	URL    string
 	Status Status
 	Weight float64
