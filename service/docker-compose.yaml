@@ -1,0 +1,56 @@
+version: '4'
+
+services:
+  service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: search_robot_service
+    ports:
+      - 8080:${SERVICE_PORT}
+    command: ./bin/service/main
+    depends_on:
+      - db
+    networks:
+      - search_robot_network
+
+  workers:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: search_robot_workers
+    command: bash -c "
+      ./bin/cli/main first &&
+      ./bin/cli/main second"
+    depends_on:
+      - db
+    networks:
+      - search_robot_network
+
+  db:
+    image: postgres:15
+    container_name: crawler_tasks_db
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_NAME}
+    ports:
+      - 5432:${PG_PORT}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - search_robot_network
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+
+# Определение тома для хранения данных PostgreSQL
+volumes:
+  postgres_data:
+
+# Определение сети для связи между контейнерами
+networks:
+  search_robot_network:
+    driver: bridge
