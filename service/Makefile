@@ -4,13 +4,13 @@ PG_NAME = crawler_tasks_db
 PG_USER = postgres
 PG_PASSWORD = postgres
 PG_DSN = postgres://$(PG_USER):$(PG_PASSWORD)@$(PG_HOST):$(PG_PORT)/$(PG_NAME)?sslmode=disable
-MIGRATION_DIR = ./db/migrations
+MIGRATION_DIR = db/migrations
 
 SERVICE_HOST = 127.0.0.1
 SERVICE_PORT = 8080
 
 MIGRATE = docker run \
-	-v ${CURDIR}/db/migrations:/migrations \
+	-v ${CURDIR}/$(MIGRATION_DIR):/migrations \
 	--network host \
 	migrate/migrate \
     -path=/migrations
