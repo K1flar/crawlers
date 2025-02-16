@@ -3,9 +3,17 @@ PG_PORT = 5432
 PG_NAME = crawler_tasks_db
 PG_USER = postgres
 PG_PASSWORD = postgres
+PG_DSN = postgres://$(PG_USER):$(PG_PASSWORD)@$(PG_HOST):$(PG_PORT)/$(PG_NAME)?sslmode=disable
+MIGRATION_DIR = db/migrations
 
 SERVICE_HOST = 127.0.0.1
 SERVICE_PORT = 8080
+
+MIGRATE = docker run \
+	-v ${CURDIR}/$(MIGRATION_DIR):/migrations \
+	--network host \
+	migrate/migrate \
+    -path=/migrations
 
 RM = rm -f
 ifeq ($(OS),Windows_NT)
@@ -19,6 +27,7 @@ env:
 	@echo PG_NAME=$(PG_NAME) >> .env 
 	@echo PG_USER=$(PG_USER) >> .env 
 	@echo PG_PASSWORD=$(PG_PASSWORD) >> .env 
+	@echo PG_DSN=$(PG_DSN) >> .env
 	@echo SERVICE_HOST=$(SERVICE_HOST) >> .env 
 	@echo SERVICE_PORT=$(SERVICE_PORT) >> .env 
 	@echo Environment variables have been successfully created
@@ -31,6 +40,11 @@ clean-env:
 db-start:
 	@docker-compose up db -d
 	@echo PostgreSQL is running 
+
+.PHONY: migrate-up
+migrate-up:
+	@$(MIGRATE) -database $(PG_DSN) up
+	@echo Migrations applied
 
 .PHONY: workers-start
 workers-start:
@@ -49,7 +63,7 @@ stop:
 	@echo The app is stopped
 
 .PHONY: service-debug
-service-debug: env db-start
+service-debug: env db-start migrate-up
 
 .PHONY: service-deploy
-service-deploy: env db-start service-start workers-start
+service-deploy: env db-start migrate-up service-start workers-start
