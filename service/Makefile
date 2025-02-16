@@ -46,6 +46,11 @@ migrate-up:
 	@$(MIGRATE) -database $(PG_DSN) up
 	@echo Migrations applied
 
+.PHONY: migrate-down
+migrate-down:
+	@$(MIGRATE) -database $(PG_DSN) down --all
+	@echo Migrations applied
+
 .PHONY: workers-start
 workers-start:
 	@docker-compose --env-file .env up workers -d
