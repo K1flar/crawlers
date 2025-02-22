@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/K1flar/crawlers/internal/gates/searx"
+	"github.com/K1flar/crawlers/internal/gates/web_scraper"
 	api_create_task "github.com/K1flar/crawlers/internal/handlers/create_task"
 	"github.com/K1flar/crawlers/internal/http_client"
 	"github.com/K1flar/crawlers/internal/storage/tasks"
@@ -46,6 +47,11 @@ func main() {
 	searxGate := searx.NewGate(log, searxClient)
 	res, err := searxGate.Search(context.Background(), "golang")
 	fmt.Println(res, err)
+
+	webScraperGate := web_scraper.NewGate(log)
+	page, err := webScraperGate.GetPage(context.Background(), res[0])
+	fmt.Println(page.URLs)
+	fmt.Println(err)
 
 	mux := http.NewServeMux()
 

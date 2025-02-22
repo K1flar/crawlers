@@ -2,24 +2,59 @@ package crawler
 
 import (
 	"context"
-	"log/slog"
+	"sync"
 
+	"github.com/K1flar/crawlers/internal/gates"
+	"github.com/K1flar/crawlers/internal/models/task"
 	"github.com/K1flar/crawlers/internal/storage"
 )
 
 type Crawler struct {
-	log            *slog.Logger
+	task           task.Task
+	searchSystem   gates.SearchSystem
 	sourcesStorage storage.Sources
+	visited        map[string]struct{}
+	mu             *sync.RWMutex
 }
 
 func New(
-	log *slog.Logger,
+	task task.Task,
+	searchSystem gates.SearchSystem,
 	sourcesStorage storage.Sources,
 ) *Crawler {
-	return &Crawler{log, sourcesStorage}
+	return &Crawler{
+		task:           task,
+		searchSystem:   searchSystem,
+		sourcesStorage: sourcesStorage,
+		visited:        map[string]struct{}{},
+		mu:             &sync.RWMutex{},
+	}
 }
 
-func (c *Crawler) Start(ctx context.Context, query string) error {
+func (c *Crawler) Start(ctx context.Context) error {
+	wg := sync.WaitGroup{}
+
+	urls, err := c.searchSystem.Search(ctx, c.task.Query)
+	if err != nil {
+		return err
+	}
+
+	wg.Add(len(urls))
+
+	for _, url := range urls {
+		url := url
+		go func() {
+			defer wg.Done()
+			c.crawl(ctx, url, 0)
+		}()
+	}
+
+	wg.Wait()
+
+	return nil
+}
+
+func (c *Crawler) crawl(ctx context.Context, url string, level int) error {
 
 	return nil
 }

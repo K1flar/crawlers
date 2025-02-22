@@ -3,6 +3,7 @@ package searx
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -40,7 +41,7 @@ func (g *Gate) Search(ctx context.Context, query string) ([]string, error) {
 
 	defer func() {
 		if err != nil {
-			g.log.Error(err.Error())
+			g.log.Error(fmt.Sprintf(`error to search "%s": %s`, query, err))
 		}
 	}()
 
@@ -67,6 +68,7 @@ func (g *Gate) Search(ctx context.Context, query string) ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+	defer res.Body.Close()
 
 	var dtoResponse dtoSearchResponse
 	err = json.Unmarshal(b, &dtoResponse)
