@@ -7,10 +7,13 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/K1flar/crawlers/internal/business_errors"
 	"github.com/K1flar/crawlers/internal/models/page"
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/sync/errgroup"
 )
+
+const defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
 
 type Gate struct {
 	log    *slog.Logger
@@ -34,13 +37,20 @@ func (g *Gate) GetPage(ctx context.Context, url string) (*page.Page, error) {
 		}
 	}()
 
-	res, err := g.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", defaultUserAgent)
+
+	res, err := g.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.New("source must be available")
+		return nil, business_errors.UnavailableSource
 	}
 
 	doc, err := goquery.NewDocumentFromReader(res.Body)
