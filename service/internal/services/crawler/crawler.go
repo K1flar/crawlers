@@ -2,12 +2,18 @@ package crawler
 
 import (
 	"context"
+	"errors"
 	"sync"
 
+	"github.com/K1flar/crawlers/internal/business_errors"
 	"github.com/K1flar/crawlers/internal/gates"
 	"github.com/K1flar/crawlers/internal/models/source"
 	"github.com/K1flar/crawlers/internal/models/task"
+	"github.com/K1flar/crawlers/internal/services"
+	"github.com/K1flar/crawlers/internal/services/collection_collector"
 	"github.com/K1flar/crawlers/internal/storage"
+	"github.com/K1flar/crawlers/utils"
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 )
 
@@ -41,8 +47,8 @@ func (c *Crawler) Start(ctx context.Context, task task.Task) error {
 		return err
 	}
 
-	existedSourcesByURL := lo.SliceToMap(sources, func(source source.Source) (string, int64) {
-		return source.URL, source.ID
+	existedSourcesByURL := lo.SliceToMap(sources, func(source source.Source) (string, string) {
+		return source.URL, source.UUID
 	})
 
 	instance := &crawlerInstance{
@@ -50,11 +56,14 @@ func (c *Crawler) Start(ctx context.Context, task task.Task) error {
 		searchSystem:        c.searchSystem,
 		webScraper:          c.webScraper,
 		sourcesStorage:      c.sourcesStorage,
+		collectionCollector: collection_collector.New(task.Query),
 		existedSourcesByURL: existedSourcesByURL,
 		visited:             map[string]struct{}{},
 		muVisited:           &sync.Mutex{},
-		pages:               []pageInfo{},
-		muPages:             &sync.Mutex{},
+		pagesToUpdate:       []pageToUpdate{},
+		muPagesToUpdate:     &sync.Mutex{},
+		pagesToCreate:       []pageToCreate{},
+		muPagesToCreate:     &sync.Mutex{},
 	}
 
 	err = instance.start(ctx)
@@ -70,20 +79,26 @@ type crawlerInstance struct {
 	searchSystem        gates.SearchSystem
 	webScraper          gates.WebScraper
 	sourcesStorage      storage.Sources
-	existedSourcesByURL map[string]int64
+	collectionCollector services.CollectionCollector
+	existedSourcesByURL map[string]string
 	visited             map[string]struct{}
 	muVisited           *sync.Mutex
-	pages               []pageInfo
-	muPages             *sync.Mutex
+	pagesToUpdate       []pageToUpdate
+	muPagesToUpdate     *sync.Mutex
+	pagesToCreate       []pageToCreate
+	muPagesToCreate     *sync.Mutex
 }
 
-type pageInfo struct {
-	IsNew      bool
-	Title      *string
-	URL        string
-	TF         float64
-	Size       int64
+type pageToUpdate struct {
+	UUID   string
+	Title  *string
+	Status *source.Status
+}
+
+type pageToCreate struct {
 	UUID       string
+	Title      string
+	URL        string
 	ParentUUID *string
 }
 
@@ -113,8 +128,13 @@ func (c *crawlerInstance) crawl(
 	ctx context.Context,
 	url string,
 	level int,
-	parent_uuid *string,
+	parentUUID *string,
 ) error {
+	sourceUUID, sourceExists := c.existedSourcesByURL[url]
+	if !sourceExists {
+		sourceUUID = uuid.NewString()
+	}
+
 	if level > c.task.DepthLevel {
 		return nil
 	}
@@ -128,9 +148,30 @@ func (c *crawlerInstance) crawl(
 	c.muVisited.Unlock()
 
 	page, err := c.webScraper.GetPage(ctx, url)
-	if err != nil {
+	switch {
+	case errors.Is(err, business_errors.UnavailableSource) && sourceExists:
+		c.addPageToUpdate(pageToUpdate{UUID: sourceUUID, Status: utils.Ptr(source.StatusUnavailable)})
+		return nil
+	case err != nil:
 		return err
 	}
+
+	if sourceExists {
+		c.addPageToUpdate(pageToUpdate{
+			UUID:   sourceUUID,
+			Title:  &page.Title,
+			Status: utils.Ptr(source.StatusUnavailable),
+		})
+	} else {
+		c.addPageToCreate(pageToCreate{
+			UUID:       sourceUUID,
+			Title:      page.Title,
+			URL:        url,
+			ParentUUID: parentUUID,
+		})
+	}
+
+	c.collectionCollector.AddPage(sourceUUID, page)
 
 	wg := sync.WaitGroup{}
 
@@ -140,11 +181,23 @@ func (c *crawlerInstance) crawl(
 		url := url
 		go func() {
 			defer wg.Done()
-			c.crawl(ctx, url, level+1, nil)
+			c.crawl(ctx, url, level+1, &sourceUUID)
 		}()
 	}
 
 	wg.Wait()
 
 	return nil
+}
+
+func (c *crawlerInstance) addPageToUpdate(page pageToUpdate) {
+	c.muPagesToUpdate.Lock()
+	c.pagesToUpdate = append(c.pagesToUpdate, page)
+	c.muPagesToUpdate.Unlock()
+}
+
+func (c *crawlerInstance) addPageToCreate(page pageToCreate) {
+	c.muPagesToCreate.Lock()
+	c.pagesToCreate = append(c.pagesToCreate, page)
+	c.muPagesToCreate.Unlock()
 }

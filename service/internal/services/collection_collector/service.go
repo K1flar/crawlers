@@ -3,6 +3,7 @@ package collection_collector
 import (
 	"math"
 	"strings"
+	"sync"
 
 	"github.com/K1flar/crawlers/internal/models/document"
 	"github.com/K1flar/crawlers/internal/models/page"
@@ -21,6 +22,7 @@ type Service struct {
 	df         map[string]int               // количество документов, содержащих определенный термин
 	avgSize    float64                      // средний размер документов
 	totalSize  int64                        // общий размер слов в коллекции
+	mu         *sync.RWMutex
 }
 
 func New(q string) *Service {
@@ -32,6 +34,7 @@ func New(q string) *Service {
 		}),
 		collection: map[string]document.Document{},
 		df:         map[string]int{},
+		mu:         &sync.RWMutex{},
 	}
 }
 
@@ -51,6 +54,7 @@ func (s *Service) AddPage(uuid string, page page.Page) {
 		tf[term] = float64(count / size)
 	}
 
+	s.mu.Lock()
 	s.collection[uuid] = document.Document{
 		UUID: uuid,
 		Size: size,
@@ -59,6 +63,7 @@ func (s *Service) AddPage(uuid string, page page.Page) {
 
 	s.totalSize += size
 	s.avgSize = float64(s.totalSize / int64(len(s.collection)))
+	s.mu.Unlock()
 }
 
 // idf https://habr.com/ru/articles/840268/

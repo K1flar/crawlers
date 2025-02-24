@@ -4,7 +4,7 @@ type Status string
 
 const (
 	StatusAvailable   Status = "available"
-	StatusUnacailable Status = "unavailable"
+	StatusUnavailable Status = "unavailable"
 )
 
 type Source struct {

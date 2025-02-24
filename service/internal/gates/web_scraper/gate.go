@@ -26,10 +26,10 @@ func NewGate(
 	return &Gate{log, http.DefaultClient}
 }
 
-func (g *Gate) GetPage(ctx context.Context, url string) (*page.Page, error) {
+func (g *Gate) GetPage(ctx context.Context, url string) (page.Page, error) {
 	var err error
 
-	page := &page.Page{}
+	page := page.Page{}
 
 	defer func() {
 		if err != nil {
@@ -39,23 +39,23 @@ func (g *Gate) GetPage(ctx context.Context, url string) (*page.Page, error) {
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return page, err
 	}
 
 	req.Header.Set("User-Agent", defaultUserAgent)
 
 	res, err := g.client.Do(req)
 	if err != nil {
-		return nil, err
+		return page, err
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, business_errors.UnavailableSource
+		return page, business_errors.UnavailableSource
 	}
 
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
-		return nil, err
+		return page, err
 	}
 	defer res.Body.Close()
 
