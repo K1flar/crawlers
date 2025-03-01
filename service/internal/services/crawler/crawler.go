@@ -2,36 +2,39 @@ package crawler
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"log/slog"
 	"sync"
+	"time"
 
-	"github.com/K1flar/crawlers/internal/business_errors"
 	"github.com/K1flar/crawlers/internal/gates"
 	"github.com/K1flar/crawlers/internal/models/source"
 	"github.com/K1flar/crawlers/internal/models/task"
-	"github.com/K1flar/crawlers/internal/services"
 	"github.com/K1flar/crawlers/internal/services/collection_collector"
 	"github.com/K1flar/crawlers/internal/storage"
-	"github.com/K1flar/crawlers/utils"
-	"github.com/google/uuid"
 	"github.com/samber/lo"
 )
 
 type Crawler struct {
+	log            *slog.Logger
 	searchSystem   gates.SearchSystem
 	webScraper     gates.WebScraper
 	sourcesStorage storage.Sources
+	now            func() time.Time
 }
 
 func New(
+	log *slog.Logger,
 	searchSystem gates.SearchSystem,
 	webScraper gates.WebScraper,
 	sourcesStorage storage.Sources,
 ) *Crawler {
 	return &Crawler{
+		log:            log,
 		searchSystem:   searchSystem,
 		webScraper:     webScraper,
 		sourcesStorage: sourcesStorage,
+		now:            time.Now,
 	}
 }
 
@@ -44,14 +47,36 @@ func New(
 func (c *Crawler) Start(ctx context.Context, task task.Task) error {
 	sources, err := c.sourcesStorage.GetByTaskID(ctx, task.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get task by ID %d: %w", task.ID, err)
 	}
 
-	existedSourcesByURL := lo.SliceToMap(sources, func(source source.Source) (string, string) {
+	instance := c.newInstance(task, sources)
+
+	timeStart := c.now()
+	c.log.Info(fmt.Sprintf("start crawler for task [%d]: %s", task.ID, task.Query))
+
+	err = instance.start(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to run crawler instance: %w", err)
+	}
+
+	c.log.Info(fmt.Sprintf("end search for task [%d] with %d sources to create and %d sources to update, [%s]",
+		task.ID, len(instance.sourcesToCreate), len(instance.sourcesToUpdate), time.Since(timeStart)))
+
+	_, err = c.createSources(ctx, instance)
+	if err != nil {
+		return fmt.Errorf("failed to create sources: %w", err)
+	}
+
+	return err
+}
+
+func (c *Crawler) newInstance(task task.Task, existedSources []source.Source) *crawlerInstance {
+	existedSourcesByURL := lo.SliceToMap(existedSources, func(source source.Source) (string, string) {
 		return source.URL, source.UUID
 	})
 
-	instance := &crawlerInstance{
+	return &crawlerInstance{
 		task:                task,
 		searchSystem:        c.searchSystem,
 		webScraper:          c.webScraper,
@@ -59,145 +84,32 @@ func (c *Crawler) Start(ctx context.Context, task task.Task) error {
 		collectionCollector: collection_collector.New(task.Query),
 		existedSourcesByURL: existedSourcesByURL,
 		visited:             map[string]struct{}{},
-		muVisited:           &sync.Mutex{},
-		pagesToUpdate:       []pageToUpdate{},
-		muPagesToUpdate:     &sync.Mutex{},
-		pagesToCreate:       []pageToCreate{},
-		muPagesToCreate:     &sync.Mutex{},
+		visitedLock:         &sync.Mutex{},
+		sourcesToCreate:     []sourceToCreate{},
+		sourcesToCreateLock: &sync.Mutex{},
+		sourcesToUpdate:     []sourceToUpdate{},
+		sourcesToUpdateLock: &sync.Mutex{},
 	}
-
-	err = instance.start(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
-type crawlerInstance struct {
-	task                task.Task
-	searchSystem        gates.SearchSystem
-	webScraper          gates.WebScraper
-	sourcesStorage      storage.Sources
-	collectionCollector services.CollectionCollector
-	existedSourcesByURL map[string]string
-	visited             map[string]struct{}
-	muVisited           *sync.Mutex
-	pagesToUpdate       []pageToUpdate
-	muPagesToUpdate     *sync.Mutex
-	pagesToCreate       []pageToCreate
-	muPagesToCreate     *sync.Mutex
-}
+func (c *Crawler) createSources(ctx context.Context, instance *crawlerInstance) ([]int64, error) {
+	sourcesToCreate := make([]storage.ToCreateSource, 0, len(instance.sourcesToCreate))
 
-type pageToUpdate struct {
-	UUID   string
-	Title  *string
-	Status *source.Status
-}
+	for _, page := range instance.sourcesToCreate {
+		bm25, ok := instance.collectionCollector.BM25(page.UUID)
+		if !ok || bm25 <= instance.task.MinWeight {
+			continue
+		}
 
-type pageToCreate struct {
-	UUID       string
-	Title      string
-	URL        string
-	ParentUUID *string
-}
-
-func (c *crawlerInstance) start(ctx context.Context) error {
-	urls, err := c.searchSystem.Search(ctx, c.task.Query)
-	if err != nil {
-		return err
-	}
-
-	wg := sync.WaitGroup{}
-	wg.Add(len(urls))
-
-	for _, url := range urls {
-		url := url
-		go func() {
-			defer wg.Done()
-			c.crawl(ctx, url, 0, nil)
-		}()
-	}
-
-	wg.Wait()
-
-	return nil
-}
-
-func (c *crawlerInstance) crawl(
-	ctx context.Context,
-	url string,
-	level int,
-	parentUUID *string,
-) error {
-	sourceUUID, sourceExists := c.existedSourcesByURL[url]
-	if !sourceExists {
-		sourceUUID = uuid.NewString()
-	}
-
-	if level > c.task.DepthLevel {
-		return nil
-	}
-
-	c.muVisited.Lock()
-	if _, exists := c.visited[url]; exists {
-		c.muVisited.Unlock()
-		return nil
-	}
-	c.visited[url] = struct{}{}
-	c.muVisited.Unlock()
-
-	page, err := c.webScraper.GetPage(ctx, url)
-	switch {
-	case errors.Is(err, business_errors.UnavailableSource) && sourceExists:
-		c.addPageToUpdate(pageToUpdate{UUID: sourceUUID, Status: utils.Ptr(source.StatusUnavailable)})
-		return nil
-	case err != nil:
-		return err
-	}
-
-	if sourceExists {
-		c.addPageToUpdate(pageToUpdate{
-			UUID:   sourceUUID,
-			Title:  &page.Title,
-			Status: utils.Ptr(source.StatusUnavailable),
-		})
-	} else {
-		c.addPageToCreate(pageToCreate{
-			UUID:       sourceUUID,
+		sourcesToCreate = append(sourcesToCreate, storage.ToCreateSource{
+			TaskID:     instance.task.ID,
 			Title:      page.Title,
-			URL:        url,
-			ParentUUID: parentUUID,
+			URL:        page.URL,
+			Weight:     bm25,
+			UUID:       page.UUID,
+			ParentUUID: page.ParentUUID,
 		})
 	}
 
-	c.collectionCollector.AddPage(sourceUUID, page)
-
-	wg := sync.WaitGroup{}
-
-	wg.Add(len(page.URLs))
-
-	for _, url := range page.URLs {
-		url := url
-		go func() {
-			defer wg.Done()
-			c.crawl(ctx, url, level+1, &sourceUUID)
-		}()
-	}
-
-	wg.Wait()
-
-	return nil
-}
-
-func (c *crawlerInstance) addPageToUpdate(page pageToUpdate) {
-	c.muPagesToUpdate.Lock()
-	c.pagesToUpdate = append(c.pagesToUpdate, page)
-	c.muPagesToUpdate.Unlock()
-}
-
-func (c *crawlerInstance) addPageToCreate(page pageToCreate) {
-	c.muPagesToCreate.Lock()
-	c.pagesToCreate = append(c.pagesToCreate, page)
-	c.muPagesToCreate.Unlock()
+	return c.sourcesStorage.Create(ctx, sourcesToCreate)
 }

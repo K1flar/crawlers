@@ -4,40 +4,37 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
+	"io"
+	"mime"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/K1flar/crawlers/internal/business_errors"
 	"github.com/K1flar/crawlers/internal/models/page"
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/text/encoding/charmap"
 )
 
 const defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+const defaultTimeout = 2 * time.Second
 
 type Gate struct {
-	log    *slog.Logger
 	client *http.Client
 }
 
-func NewGate(
-	log *slog.Logger,
-) *Gate {
-	return &Gate{log, http.DefaultClient}
+func NewGate() *Gate {
+	return &Gate{http.DefaultClient}
 }
 
 func (g *Gate) GetPage(ctx context.Context, url string) (page.Page, error) {
-	var err error
-
 	page := page.Page{}
 
-	defer func() {
-		if err != nil {
-			g.log.Error(fmt.Sprintf(`error receiving the page %s: %s`, url, err))
-		}
-	}()
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return page, err
 	}
@@ -48,16 +45,32 @@ func (g *Gate) GetPage(ctx context.Context, url string) (page.Page, error) {
 	if err != nil {
 		return page, err
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
 		return page, business_errors.UnavailableSource
 	}
 
-	doc, err := goquery.NewDocumentFromReader(res.Body)
+	var reader io.Reader
+
+	_, params, _ := mime.ParseMediaType(res.Header.Get("Content-type"))
+	contentType := strings.ToLower(params["charset"])
+
+	switch contentType {
+	case "utf-8":
+		reader = res.Body
+	case "windows-1251":
+		reader = charmap.Windows1251.NewDecoder().Reader(res.Body)
+	case "iso-8859-1":
+		reader = charmap.ISO8859_1.NewDecoder().Reader(res.Body)
+	default:
+		return page, fmt.Errorf("unsopported content type")
+	}
+
+	doc, err := goquery.NewDocumentFromReader(reader)
 	if err != nil {
 		return page, err
 	}
-	defer res.Body.Close()
 
 	errGrp, _ := errgroup.WithContext(ctx)
 

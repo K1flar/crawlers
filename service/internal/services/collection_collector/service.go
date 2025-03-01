@@ -26,14 +26,14 @@ type Service struct {
 }
 
 func New(q string) *Service {
-	terms := strings.Split(q, " ")
+	terms := lo.SliceToMap(strings.Split(strings.ToLower(q), " "), func(term string) (string, struct{}) {
+		return term, struct{}{}
+	})
 
 	return &Service{
-		terms: lo.SliceToMap(terms, func(term string) (string, struct{}) {
-			return term, struct{}{}
-		}),
+		terms:      terms,
 		collection: map[string]document.Document{},
-		df:         map[string]int{},
+		df:         make(map[string]int, len(terms)),
 		mu:         &sync.RWMutex{},
 	}
 }
@@ -44,14 +44,15 @@ func (s *Service) AddPage(uuid string, page page.Page) {
 
 	termsCount := make(map[string]int64, len(s.terms))
 	for _, word := range words {
+		word = strings.ToLower(word)
 		if _, ok := s.terms[word]; ok {
 			termsCount[word]++
 		}
 	}
 
 	tf := make(map[string]float64, len(s.terms))
-	for term, count := range termsCount {
-		tf[term] = float64(count / size)
+	for term := range s.terms {
+		tf[term] = float64(termsCount[term]) / float64(size)
 	}
 
 	s.mu.Lock()
@@ -62,7 +63,13 @@ func (s *Service) AddPage(uuid string, page page.Page) {
 	}
 
 	s.totalSize += size
-	s.avgSize = float64(s.totalSize / int64(len(s.collection)))
+	s.avgSize = float64(s.totalSize) / float64(len(s.collection))
+
+	for term := range s.terms {
+		if termsCount[term] > 0 {
+			s.df[term]++
+		}
+	}
 	s.mu.Unlock()
 }
 
@@ -77,7 +84,7 @@ func (s *Service) BM25(uuid string) (float64, bool) {
 
 	for term := range s.terms {
 		numerator := float64(doc.TF[term] * (k + 1))
-		denominator := float64(doc.TF[term]+k*(1-b+b*float64(doc.Size)/s.avgSize)) + 0.5
+		denominator := float64(doc.TF[term] + k*(1-b+b*float64(doc.Size)/s.avgSize))
 		bm25 += s.idf(term) * numerator / denominator
 	}
 

@@ -31,6 +31,13 @@ type dtoResponse struct {
 }
 
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
+	var err error
+	defer func() {
+		if err != nil {
+			h.log.Error(err.Error())
+		}
+	}()
+
 	dto, err := common.DTO[dtoRequest](r)
 	if err != nil {
 		common.BadRequest(w, "bad request body")
