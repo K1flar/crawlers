@@ -4,9 +4,9 @@ CREATE TABLE IF NOT EXISTS sources (
     title TEXT NOT NULL,
     url TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'available',
-    weight FLOAT NOT NULL
-    uuid uuid NOT NULL
-    parent_uuid uuid
+    weight FLOAT NOT NULL,
+    uuid UUID NOT NULL,
+    parent_uuid UUID,
 
     UNIQUE (uuid)
 )
