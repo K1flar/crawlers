@@ -8,8 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-
-	"github.com/samber/lo"
+	"strings"
 )
 
 type Client interface {
@@ -76,7 +75,12 @@ func (g *Gate) Search(ctx context.Context, query string) ([]string, error) {
 		return []string{}, err
 	}
 
-	return lo.Map(dtoResponse.Res, func(source dtoSearchSource, _ int) string {
-		return source.URL
-	}), nil
+	urls := make([]string, 0, len(dtoResponse.Res))
+	for _, source := range dtoResponse.Res {
+		if strings.Contains(source.URL, "http") {
+			urls = append(urls, source.URL)
+		}
+	}
+
+	return urls, nil
 }

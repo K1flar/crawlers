@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/K1flar/crawlers/internal/models/task"
-	task_model "github.com/K1flar/crawlers/internal/models/task"
 	"github.com/K1flar/crawlers/internal/storage"
 	"github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
@@ -82,7 +81,7 @@ func (s *Storage) Create(ctx context.Context, params storage.ToCreateTask) (int6
 		).
 		Values(
 			params.Query,
-			task_model.StatusCreated,
+			task.StatusCreated,
 			now,
 			now,
 			defaultDepthLevelCol,
