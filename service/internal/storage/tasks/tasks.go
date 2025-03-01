@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/K1flar/crawlers/internal/models/task"
 	task_model "github.com/K1flar/crawlers/internal/models/task"
 	"github.com/K1flar/crawlers/internal/storage"
 	"github.com/Masterminds/squirrel"
@@ -34,18 +35,34 @@ const (
 	defaultMinWeightCol  = 0
 )
 
+var readColumns = []string{idCol, queryCol, statusCol, createdAtCol, updatedAtCol, depthLevelCol, minWeightCol}
+
 type taskPG struct {
-	id         int64     `db:"id"`
-	query      string    `db:"query"`
-	status     string    `db:"status"`
-	createdAt  time.Time `db:"created_at"`
-	updatedAt  time.Time `db:"updated_at"`
-	depthLevel int       `db:"depth_level"`
-	minWeight  float64   `db:"min_weight"`
+	ID         int64     `db:"id"`
+	Query      string    `db:"query"`
+	Status     string    `db:"status"`
+	CreatedAt  time.Time `db:"created_at"`
+	UpdatedAt  time.Time `db:"updated_at"`
+	DepthLevel int       `db:"depth_level"`
+	MinWeight  float64   `db:"min_weight"`
 }
 
 func NewStorage(db *sqlx.DB) *Storage {
 	return &Storage{db}
+}
+
+func (s *Storage) GetByID(ctx context.Context, id int64) (task.Task, error) {
+	var task taskPG
+
+	sql, args := pgSql.
+		Select(readColumns...).
+		From(tasksTbl).
+		Where(squirrel.Eq{idCol: id}).
+		MustSql()
+
+	err := s.db.GetContext(ctx, &task, sql, args...)
+
+	return mapFromPG(task), err
 }
 
 func (s *Storage) Create(ctx context.Context, params storage.ToCreateTask) (int64, error) {
@@ -77,6 +94,18 @@ func (s *Storage) Create(ctx context.Context, params storage.ToCreateTask) (int6
 	err := s.db.GetContext(ctx, &id, sql, args...)
 
 	return id, err
+}
+
+func mapFromPG(pg taskPG) task.Task {
+	return task.Task{
+		ID:         pg.ID,
+		Query:      pg.Query,
+		Status:     task.Status(pg.Status),
+		CreatedAt:  pg.CreatedAt,
+		UpdatedAt:  pg.UpdatedAt,
+		DepthLevel: pg.DepthLevel,
+		MinWeight:  pg.MinWeight,
+	}
 }
 
 func returning(cols ...string) string {

@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: search_robot_service
     ports:
-      - 8080:${SERVICE_PORT}
+      - ${SERVICE_PORT}:8080
     command: ./bin/service/main
     depends_on:
       - db
@@ -35,7 +35,7 @@ services:
       POSTGRES_PASSWORD: ${PG_PASSWORD}
       POSTGRES_DB: ${PG_NAME}
     ports:
-      - 5432:${PG_PORT}
+      - ${PG_PORT}:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -45,6 +45,21 @@ services:
       interval: 2s
       timeout: 1s
       retries: 5
+
+  searx:
+    image: searxng/searxng
+    container_name: searx
+    environment:
+      SEARXNG_SECRET: 5a1f4e3b2c8d7e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8g9h0i1j2k3l4
+      SEARX_SETTINGS_PATH: /etc/searx/settings.yml
+      BASE_URL: http://${SEARX_HOST}:${SEARX_PORT}
+      INSTANCE_NAME: my-instance
+    ports:
+      - ${SEARX_PORT}:8080
+    volumes:
+      - ./searxng:/etc/searxng
+    networks:
+      - search_robot_network
 
 # Определение тома для хранения данных PostgreSQL
 volumes:

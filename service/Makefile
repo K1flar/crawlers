@@ -9,6 +9,9 @@ MIGRATION_DIR = db/migrations
 SERVICE_HOST = 127.0.0.1
 SERVICE_PORT = 8080
 
+SEARX_HOST = 127.0.0.1
+SEARX_PORT = 8888
+
 MIGRATE = docker run \
 	-v ${CURDIR}/$(MIGRATION_DIR):/migrations \
 	--network host \
@@ -30,6 +33,8 @@ env:
 	@echo PG_DSN=$(PG_DSN) >> .env
 	@echo SERVICE_HOST=$(SERVICE_HOST) >> .env 
 	@echo SERVICE_PORT=$(SERVICE_PORT) >> .env 
+	@echo SEARX_HOST=$(SEARX_HOST) >> .env 
+	@echo SEARX_PORT=$(SEARX_PORT) >> .env 
 	@echo Environment variables have been successfully created
 
 .PHONY: clean-env
@@ -61,6 +66,11 @@ service-start:
 	@docker-compose --env-file .env up service -d
 	@echo Service is running
 
+.PHONY: searx-start
+searx-start:
+	@docker-compose up searx -d
+	@echo Searx is running
+
 .PHONY: stop
 stop:
 	@docker-compose down 
@@ -68,7 +78,7 @@ stop:
 	@echo The app is stopped
 
 .PHONY: service-debug
-service-debug: env db-start migrate-up
+service-debug: env db-start migrate-up searx-start
 
 .PHONY: service-deploy
-service-deploy: env db-start migrate-up service-start workers-start
+service-deploy: env db-start migrate-up service-start workers-start searx-start
