@@ -61,6 +61,14 @@ services:
     networks:
       - search_robot_network
 
+  kafka:
+    image: apache/kafka
+    container_name: kafka
+    ports:
+      - ${KAFKA_PORT}:9092
+    networks:
+      - search_robot_network
+
 # Определение тома для хранения данных PostgreSQL
 volumes:
   postgres_data:
