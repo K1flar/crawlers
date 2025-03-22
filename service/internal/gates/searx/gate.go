@@ -8,8 +8,15 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
+)
 
-	"github.com/samber/lo"
+const (
+	urlPattern = `^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$`
+)
+
+var (
+	urlRegex = regexp.MustCompile(urlPattern)
 )
 
 type Client interface {
@@ -76,7 +83,12 @@ func (g *Gate) Search(ctx context.Context, query string) ([]string, error) {
 		return []string{}, err
 	}
 
-	return lo.Map(dtoResponse.Res, func(source dtoSearchSource, _ int) string {
-		return source.URL
-	}), nil
+	urls := make([]string, 0, len(dtoResponse.Res))
+	for _, source := range dtoResponse.Res {
+		if urlRegex.MatchString(source.URL) {
+			urls = append(urls, source.URL)
+		}
+	}
+
+	return urls, nil
 }

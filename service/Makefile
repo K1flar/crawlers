@@ -12,6 +12,10 @@ SERVICE_PORT = 8080
 SEARX_HOST = 127.0.0.1
 SEARX_PORT = 8888
 
+KAFKA_HOST = 127.0.0.1
+KAFKA_PORT = 9092
+KAFKA_TASKS_TOPIC = tasks-to-process
+
 MIGRATE = docker run \
 	-v ${CURDIR}/$(MIGRATION_DIR):/migrations \
 	--network host \
@@ -35,6 +39,9 @@ env:
 	@echo SERVICE_PORT=$(SERVICE_PORT) >> .env 
 	@echo SEARX_HOST=$(SEARX_HOST) >> .env 
 	@echo SEARX_PORT=$(SEARX_PORT) >> .env 
+	@echo KAFKA_HOST=$(KAFKA_HOST) >> .env 
+	@echo KAFKA_PORT=$(KAFKA_PORT) >> .env 
+	@echo KAFKA_TASKS_TOPIC=$(KAFKA_TASKS_TOPIC) >> .env
 	@echo Environment variables have been successfully created
 
 .PHONY: clean-env
@@ -71,6 +78,21 @@ searx-start:
 	@docker-compose up searx -d
 	@echo Searx is running
 
+.PHONY: kafka-start
+kafka-start: 
+	@docker-compose up kafka -d
+	@echo Kafka cluster is running
+
+.PHONY: create-tasks-topic
+create-tasks-topic: 
+	@docker exec -it kafka \
+	/opt/kafka/bin/kafka-topics.sh --create \
+	--topic $(KAFKA_TASKS_TOPIC) \
+	--bootstrap-server localhost:9092 \
+	--partitions 1 \
+	--replication-factor 1
+	@echo Topic for start tasks is created
+
 .PHONY: stop
 stop:
 	@docker-compose down 
@@ -78,7 +100,7 @@ stop:
 	@echo The app is stopped
 
 .PHONY: service-debug
-service-debug: env db-start migrate-up searx-start
+service-debug: env db-start migrate-up searx-start kafka-start create-tasks-topic
 
 .PHONY: service-deploy
-service-deploy: env db-start migrate-up service-start workers-start searx-start
+service-deploy: env db-start migrate-up service-start workers-start searx-start kafka-start create-tasks-topic
