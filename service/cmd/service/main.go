@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/IBM/sarama"
 	"github.com/K1flar/crawlers/internal/gates/searx"
 	"github.com/K1flar/crawlers/internal/gates/web_scraper"
 	api_create_task "github.com/K1flar/crawlers/internal/handlers/create_task"
@@ -19,6 +20,20 @@ import (
 	_ "github.com/lib/pq"
 )
 
+var (
+	serviceHost = os.Getenv("SERVICE_HOST")
+	servicePort = os.Getenv("SERVICE_PORT")
+
+	postgresDSN = os.Getenv("PG_DSN")
+
+	searxHost = os.Getenv("SEARX_HOST")
+	searxPort = os.Getenv("SEARX_PORT")
+
+	kafkaHost           = os.Getenv("KAFKA_HOST")
+	kafkaPort           = os.Getenv("KAFKA_PORT")
+	tasksToProcessTopic = os.Getenv("KAFKA_TASKS_TOPIC")
+)
+
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -28,7 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := sqlx.Connect("postgres", os.Getenv("PG_DSN"))
+	db, err := sqlx.Connect("postgres", postgresDSN)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
@@ -43,7 +58,7 @@ func main() {
 	sources := sources.NewStorage(db)
 
 	searxClient := http_client.New(
-		http_client.WithBaseURL(os.Getenv("SEARX_HOST") + ":" + os.Getenv("SEARX_PORT")),
+		http_client.WithBaseURL(searxHost + ":" + searxPort),
 	)
 	searxGate := searx.NewGate(log, searxClient)
 
@@ -53,12 +68,21 @@ func main() {
 
 	createTaskStory := create_task.NewStory(log, tasks, crawler)
 
+	kafkaProducerConfig := sarama.NewConfig()
+	kafkaProducerConfig.Producer.Return.Successes = true
+
+	_, err = sarama.NewSyncProducer([]string{kafkaHost, kafkaPort}, kafkaProducerConfig)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(1)
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /create-task", api_create_task.New(log, createTaskStory).Handle)
 
-	log.Info(fmt.Sprintf("Starting server on %s:%s", os.Getenv("SERVICE_HOST"), os.Getenv("SERVICE_PORT")))
-	if err := http.ListenAndServe(os.Getenv("SERVICE_HOST")+":"+os.Getenv("SERVICE_PORT"), mux); err != nil {
+	log.Info(fmt.Sprintf("Starting server on %s:%s", serviceHost, servicePort))
+	if err := http.ListenAndServe(serviceHost+":"+servicePort, mux); err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
