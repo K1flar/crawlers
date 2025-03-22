@@ -8,7 +8,15 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strings"
+	"regexp"
+)
+
+const (
+	urlPattern = `^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$`
+)
+
+var (
+	urlRegex = regexp.MustCompile(urlPattern)
 )
 
 type Client interface {
@@ -77,7 +85,7 @@ func (g *Gate) Search(ctx context.Context, query string) ([]string, error) {
 
 	urls := make([]string, 0, len(dtoResponse.Res))
 	for _, source := range dtoResponse.Res {
-		if strings.Contains(source.URL, "http") {
+		if urlRegex.MatchString(source.URL) {
 			urls = append(urls, source.URL)
 		}
 	}

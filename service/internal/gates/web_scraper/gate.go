@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,8 +18,16 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
-const defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
-const defaultTimeout = 2 * time.Second
+const (
+	defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+	defaultTimeout   = 2 * time.Second
+
+	urlPattern = `^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$`
+)
+
+var (
+	urlRegex = regexp.MustCompile(urlPattern)
+)
 
 type Gate struct {
 	client *http.Client
@@ -87,7 +96,9 @@ func (g *Gate) GetPage(ctx context.Context, url string) (page.Page, error) {
 	errGrp.Go(func() error {
 		doc.Find("a").Each(func(_ int, s *goquery.Selection) {
 			if url, exists := s.Attr("href"); exists {
-				page.URLs = append(page.URLs, url)
+				if urlRegex.MatchString(url) {
+					page.URLs = append(page.URLs, url)
+				}
 			}
 		})
 

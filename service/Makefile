@@ -14,7 +14,7 @@ SEARX_PORT = 8888
 
 KAFKA_HOST = 127.0.0.1
 KAFKA_PORT = 9092
-KAFKA_TASKS_TOPIC = tasks-to-create
+KAFKA_TASKS_TOPIC = tasks-to-process
 
 MIGRATE = docker run \
 	-v ${CURDIR}/$(MIGRATION_DIR):/migrations \
