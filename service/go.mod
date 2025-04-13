@@ -3,6 +3,7 @@ module github.com/K1flar/crawlers
 go 1.23.6
 
 require (
+	github.com/IBM/sarama v1.45.1
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/google/uuid v1.6.0
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	github.com/IBM/sarama v1.45.1 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/eapache/go-resiliency v1.7.0 // indirect
