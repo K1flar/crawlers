@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/IBM/sarama"
 	"github.com/K1flar/crawlers/internal/gates/searx"
 	"github.com/K1flar/crawlers/internal/gates/web_scraper"
 	api_create_task "github.com/K1flar/crawlers/internal/handlers/create_task"
@@ -67,15 +66,6 @@ func main() {
 	crawler := crawler.New(log, searxGate, webScraperGate, sources)
 
 	createTaskStory := create_task.NewStory(log, tasks, crawler)
-
-	kafkaProducerConfig := sarama.NewConfig()
-	kafkaProducerConfig.Producer.Return.Successes = true
-
-	_, err = sarama.NewSyncProducer([]string{kafkaHost, kafkaPort}, kafkaProducerConfig)
-	if err != nil {
-		log.Error(err.Error())
-		os.Exit(1)
-	}
 
 	mux := http.NewServeMux()
 
