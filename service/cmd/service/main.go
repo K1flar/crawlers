@@ -19,18 +19,14 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var (
-	serviceHost = os.Getenv("SERVICE_HOST")
-	servicePort = os.Getenv("SERVICE_PORT")
+const (
+	serviceHost = "SERVICE_HOST"
+	servicePort = "SERVICE_PORT"
 
-	postgresDSN = os.Getenv("PG_DSN")
+	postgresDSN = "PG_DSN"
 
-	searxHost = os.Getenv("SEARX_HOST")
-	searxPort = os.Getenv("SEARX_PORT")
-
-	kafkaHost           = os.Getenv("KAFKA_HOST")
-	kafkaPort           = os.Getenv("KAFKA_PORT")
-	tasksToProcessTopic = os.Getenv("KAFKA_TASKS_TOPIC")
+	searxHost = "SEARX_HOST"
+	searxPort = "SEARX_PORT"
 )
 
 func main() {
@@ -42,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := sqlx.Connect("postgres", postgresDSN)
+	db, err := sqlx.Connect("postgres", os.Getenv(postgresDSN))
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
@@ -57,7 +53,7 @@ func main() {
 	sources := sources.NewStorage(db)
 
 	searxClient := http_client.New(
-		http_client.WithBaseURL(searxHost + ":" + searxPort),
+		http_client.WithBaseURL(os.Getenv(searxHost) + ":" + os.Getenv(searxPort)),
 	)
 	searxGate := searx.NewGate(log, searxClient)
 
@@ -71,8 +67,8 @@ func main() {
 
 	mux.HandleFunc("POST /create-task", api_create_task.New(log, createTaskStory).Handle)
 
-	log.Info(fmt.Sprintf("Starting server on %s:%s", serviceHost, servicePort))
-	if err := http.ListenAndServe(serviceHost+":"+servicePort, mux); err != nil {
+	log.Info(fmt.Sprintf("Starting server on %s:%s", os.Getenv(serviceHost), os.Getenv(servicePort)))
+	if err := http.ListenAndServe(os.Getenv(serviceHost)+":"+os.Getenv(servicePort), mux); err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
