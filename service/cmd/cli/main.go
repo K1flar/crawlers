@@ -90,7 +90,13 @@ func main() {
 		},
 	}
 
-	cmds[cliSlug](ctx)
+	cmd, ok := cmds[cliSlug]
+	if !ok {
+		log.Error("unknown cmd")
+		os.Exit(1)
+	}
+
+	cmd(ctx)
 
 	producer.Close()
 	consumer.Close()
