@@ -1,6 +1,16 @@
+import React from 'react';
+import { BrowserRouter,Route, Routes, Link } from 'react-router';
+import HomePage from './HomePage';
+import TaskPage from './TaskPage';
+
 function App() {
   return (
-    <>Hello world</>
+    <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/task/:id" element={<TaskPage />} />
+        </Routes>
+    </BrowserRouter>
   );
 }
 
