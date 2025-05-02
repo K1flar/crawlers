@@ -9,7 +9,9 @@ import (
 
 type Tasks interface {
 	GetByID(ctx context.Context, id int64) (task.Task, error)
+	FindInStatuses(ctx context.Context, statuses []task.Status) ([]task.Task, error)
 	Create(ctx context.Context, params ToCreateTask) (int64, error)
+	SetStatus(ctx context.Context, id int64, status task.Status) error
 }
 
 type Sources interface {

@@ -10,6 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/samber/lo v1.49.1
+	github.com/segmentio/kafka-go v0.4.47
 	golang.org/x/sync v0.12.0
 	golang.org/x/text v0.23.0
 )
@@ -20,6 +21,5 @@ require (
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
-	github.com/segmentio/kafka-go v0.4.47 // indirect
 	golang.org/x/net v0.37.0 // indirect
 )

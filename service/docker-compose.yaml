@@ -20,8 +20,8 @@ services:
       dockerfile: Dockerfile
     container_name: search_robot_workers
     command: bash -c "
-      ./bin/cli/main first &&
-      ./bin/cli/main second"
+      ./bin/cli/main tasks-to-process-producer &&
+      ./bin/cli/main tasks-to-process-consumer"
     depends_on:
       - db
     networks:

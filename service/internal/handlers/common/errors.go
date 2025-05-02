@@ -9,7 +9,7 @@ import (
 func ErrorMsg(err error) string {
 	switch {
 	case errors.Is(err, business_errors.InvalidQuery):
-		return "Некорректная тема"
+		return "Некорректный поисковый запрос"
 	}
 
 	return "Неизвестная ошибка, повторите позже"

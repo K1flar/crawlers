@@ -53,7 +53,7 @@ func (c *Crawler) Start(ctx context.Context, task task.Task) error {
 	instance := c.newInstance(task, sources)
 
 	timeStart := c.now()
-	c.log.Info(fmt.Sprintf("start crawler for task [%d]: %s", task.ID, task.Query))
+	c.log.Info(fmt.Sprintf("start crawler for task [%d]: [%s]", task.ID, task.Query))
 
 	err = instance.start(ctx)
 	if err != nil {

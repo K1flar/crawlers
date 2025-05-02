@@ -5,10 +5,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/K1flar/crawlers/internal/business_errors"
 	"github.com/K1flar/crawlers/internal/models/task"
 	"github.com/K1flar/crawlers/internal/storage"
 	"github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
+	"github.com/samber/lo"
 )
 
 var _ storage.Tasks = (*Storage)(nil)
@@ -22,16 +24,21 @@ var pgSql = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 const (
 	tasksTbl = "tasks"
 
-	idCol         = "id"
-	queryCol      = "query"
-	statusCol     = "status"
-	createdAtCol  = "created_at"
-	updatedAtCol  = "updated_at"
-	depthLevelCol = "depth_level"
-	minWeightCol  = "min_weight"
+	idCol                  = "id"
+	queryCol               = "query"
+	statusCol              = "status"
+	createdAtCol           = "created_at"
+	updatedAtCol           = "updated_at"
+	processedAtCol         = "processed_at"
+	depthLevelCol          = "depth_level"
+	minWeightCol           = "min_weight"
+	maxSources             = "max_sources"
+	maxNeighboursForSource = "max_neighbours_for_source"
 
-	defaultDepthLevelCol = 3
-	defaultMinWeightCol  = 0
+	defaultDepthLevelCol          = 3
+	defaultMinWeightCol           = 0
+	defaultMaxSources             = 20
+	defaultMaxNeighboursForSource = 5
 )
 
 var readColumns = []string{idCol, queryCol, statusCol, createdAtCol, updatedAtCol, depthLevelCol, minWeightCol}
@@ -62,6 +69,20 @@ func (s *Storage) GetByID(ctx context.Context, id int64) (task.Task, error) {
 	err := s.db.GetContext(ctx, &task, sql, args...)
 
 	return mapFromPG(task), err
+}
+
+func (s *Storage) FindInStatuses(ctx context.Context, statuses []task.Status) ([]task.Task, error) {
+	var tasks []taskPG
+
+	sql, args := pgSql.
+		Select(readColumns...).
+		From(tasksTbl).
+		Where(squirrel.Eq{statusCol: statuses}).
+		MustSql()
+
+	err := s.db.SelectContext(ctx, &tasks, sql, args...)
+
+	return mapFromPgMany(tasks), err
 }
 
 func (s *Storage) Create(ctx context.Context, params storage.ToCreateTask) (int64, error) {
@@ -95,6 +116,30 @@ func (s *Storage) Create(ctx context.Context, params storage.ToCreateTask) (int6
 	return id, err
 }
 
+func (s *Storage) SetStatus(ctx context.Context, id int64, status task.Status) error {
+	sql, args := pgSql.
+		Update(tasksTbl).
+		Set(statusCol, status).
+		Where(squirrel.Eq{idCol: id}).
+		MustSql()
+
+	res, err := s.db.ExecContext(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return business_errors.EntityNotFound
+	}
+
+	return nil
+}
+
 func mapFromPG(pg taskPG) task.Task {
 	return task.Task{
 		ID:         pg.ID,
@@ -105,6 +150,12 @@ func mapFromPG(pg taskPG) task.Task {
 		DepthLevel: pg.DepthLevel,
 		MinWeight:  pg.MinWeight,
 	}
+}
+
+func mapFromPgMany(pgs []taskPG) []task.Task {
+	return lo.Map(pgs, func(pg taskPG, _ int) task.Task {
+		return mapFromPG(pg)
+	})
 }
 
 func returning(cols ...string) string {

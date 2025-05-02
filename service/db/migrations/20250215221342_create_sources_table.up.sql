@@ -1,12 +1,10 @@
 CREATE TABLE IF NOT EXISTS sources (
     id BIGSERIAL PRIMARY KEY,
-    task_id BIGINT REFERENCES tasks(id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
     title TEXT NOT NULL,
     url TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'available',
-    weight FLOAT NOT NULL,
-    uuid UUID NOT NULL,
-    parent_uuid UUID,
+    status TEXT NOT NULL,
 
-    UNIQUE (uuid)
-)
+    UNIQUE (url)
+);

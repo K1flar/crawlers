@@ -6,12 +6,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/K1flar/crawlers/internal/gates/searx"
-	"github.com/K1flar/crawlers/internal/gates/web_scraper"
 	api_create_task "github.com/K1flar/crawlers/internal/handlers/create_task"
-	"github.com/K1flar/crawlers/internal/http_client"
-	"github.com/K1flar/crawlers/internal/services/crawler"
-	"github.com/K1flar/crawlers/internal/storage/sources"
+	"github.com/K1flar/crawlers/internal/message_broker/kafka"
+	"github.com/K1flar/crawlers/internal/message_broker/messages"
 	"github.com/K1flar/crawlers/internal/storage/tasks"
 	"github.com/K1flar/crawlers/internal/stories/create_task"
 	"github.com/jmoiron/sqlx"
@@ -24,6 +21,10 @@ const (
 	servicePort = "SERVICE_PORT"
 
 	postgresDSN = "PG_DSN"
+
+	kafkaHost           = "KAFKA_HOST"
+	kafkaPort           = "KAFKA_PORT"
+	tasksToProcessTopic = "KAFKA_TASKS_TOPIC"
 
 	searxHost = "SEARX_HOST"
 	searxPort = "SEARX_PORT"
@@ -50,18 +51,14 @@ func main() {
 	}
 
 	tasks := tasks.NewStorage(db)
-	sources := sources.NewStorage(db)
 
-	searxClient := http_client.New(
-		http_client.WithBaseURL(os.Getenv(searxHost) + ":" + os.Getenv(searxPort)),
-	)
-	searxGate := searx.NewGate(log, searxClient)
+	kafkaBrokers := []string{
+		fmt.Sprintf("%s:%s", os.Getenv(kafkaHost), os.Getenv(kafkaPort)),
+	}
 
-	webScraperGate := web_scraper.NewGate()
+	producerTasksToProcess := kafka.NewProducer[messages.TaskToProcessMessage](kafkaBrokers, os.Getenv(tasksToProcessTopic))
 
-	crawler := crawler.New(log, searxGate, webScraperGate, sources)
-
-	createTaskStory := create_task.NewStory(log, tasks, crawler)
+	createTaskStory := create_task.NewStory(log, tasks, producerTasksToProcess)
 
 	mux := http.NewServeMux()
 
