@@ -93,14 +93,10 @@ func mapFromPGMany(sources []sourcePG) []source.Source {
 
 func mapFromPG(pg sourcePG) source.Source {
 	return source.Source{
-		ID:         pg.ID,
-		TaskID:     pg.TaskID,
-		Title:      pg.Title,
-		URL:        pg.URL,
-		Status:     source.Status(pg.Status),
-		Weight:     pg.Weight,
-		UUID:       pg.UUID,
-		ParentUUID: pg.ParentUUID,
+		ID:     pg.ID,
+		Title:  pg.Title,
+		URL:    pg.URL,
+		Status: source.Status(pg.Status),
 	}
 }
 

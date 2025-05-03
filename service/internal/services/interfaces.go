@@ -8,7 +8,7 @@ import (
 )
 
 type Crawler interface {
-	Start(ctx context.Context, task task.Task) error
+	Start(ctx context.Context, task task.Task) (map[string]*page.PageWithParentURL, error)
 }
 
 type CollectionCollector interface {

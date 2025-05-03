@@ -1,7 +1,11 @@
 package storage
 
 type ToCreateTask struct {
-	Query string
+	Query                  string
+	DepthLevel             int64
+	MinWeight              int64
+	MaxSources             int64
+	MaxNeighboursForSource int64
 }
 
 type ToCreateSource struct {

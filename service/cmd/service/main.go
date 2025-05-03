@@ -9,6 +9,7 @@ import (
 	api_create_task "github.com/K1flar/crawlers/internal/handlers/create_task"
 	"github.com/K1flar/crawlers/internal/message_broker/kafka"
 	"github.com/K1flar/crawlers/internal/message_broker/messages"
+	"github.com/K1flar/crawlers/internal/middlewares/cors"
 	"github.com/K1flar/crawlers/internal/storage/tasks"
 	"github.com/K1flar/crawlers/internal/stories/create_task"
 	"github.com/jmoiron/sqlx"
@@ -62,7 +63,15 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /create-task", api_create_task.New(log, createTaskStory).Handle)
+	corsMW := cors.New()
+
+	mux.HandleFunc("OPTIONS /", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, PATCH")
+		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	})
+
+	mux.Handle("POST /create-task", corsMW(http.HandlerFunc(api_create_task.New(log, createTaskStory).Handle)))
 
 	log.Info(fmt.Sprintf("Starting server on %s:%s", os.Getenv(serviceHost), os.Getenv(servicePort)))
 	if err := http.ListenAndServe(os.Getenv(serviceHost)+":"+os.Getenv(servicePort), mux); err != nil {

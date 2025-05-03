@@ -16,6 +16,11 @@ import (
 const (
 	maxCountWords = 10
 	maxLenWord    = 20
+
+	defaultDepthLevel             = 3
+	defaultMinWeight              = 0
+	defaultMaxSources             = 20
+	defaultMaxNeighboursForSource = 20
 )
 
 type Story struct {
@@ -38,7 +43,11 @@ func (s *Story) Create(ctx context.Context, query string) (int64, error) {
 	}
 
 	id, err := s.tasks.Create(ctx, storage.ToCreateTask{
-		Query: query,
+		Query:                  query,
+		DepthLevel:             defaultDepthLevel,
+		MinWeight:              defaultMinWeight,
+		MaxSources:             defaultMaxSources,
+		MaxNeighboursForSource: defaultMaxNeighboursForSource,
 	})
 	if err != nil {
 		return 0, err
@@ -73,7 +82,7 @@ func (s *Story) validateQuery(query string) error {
 	}
 
 	for _, w := range words {
-		if len(w) > maxLenWord {
+		if len([]rune(w)) > maxLenWord {
 			return business_errors.InvalidQuery
 		}
 	}

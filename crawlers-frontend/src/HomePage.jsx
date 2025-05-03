@@ -11,10 +11,10 @@ const HomePage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const response = await fetch('http://127.0.0.1:8080/create-task', {
         method: 'POST',
@@ -23,12 +23,17 @@ const HomePage = () => {
         },
         body: JSON.stringify({ query }),
       });
-      
-      if (!response.ok) {
-        throw new Error('Ошибка при создании задачи');
-      }
-      
+
       const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error(data.error || 'Неизвестная ошибка, попробуйте позже');
+        }
+
+        throw new Error('Неизвестная ошибка, попробуйте позже');
+      }
+
       navigate(`/task/${data.id}`);
     } catch (err) {
       setError(err.message);
@@ -40,7 +45,7 @@ const HomePage = () => {
   return (
     <div className="home-container">
       <h1>Система администрирования поисковых роботов</h1>
-      
+
       <form onSubmit={handleSubmit} className="search-form">
         <input
           type="text"
@@ -50,15 +55,15 @@ const HomePage = () => {
           className="search-input"
           required
         />
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="search-button"
           disabled={isLoading}
         >
           {isLoading ? 'Создание...' : 'Запустить'}
         </button>
       </form>
-      
+
       {error && <div className="error-message">{error}</div>}
     </div>
   );

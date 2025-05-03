@@ -11,5 +11,5 @@ type SearchSystem interface {
 }
 
 type WebScraper interface {
-	GetPage(ctx context.Context, url string) (page.Page, error)
+	GetPage(ctx context.Context, url string) (*page.Page, error)
 }

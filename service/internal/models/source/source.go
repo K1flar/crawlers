@@ -1,5 +1,7 @@
 package source
 
+import "time"
+
 type Status string
 
 const (
@@ -8,12 +10,10 @@ const (
 )
 
 type Source struct {
-	ID         int64
-	TaskID     int64
-	Title      string
-	URL        string
-	Status     Status
-	Weight     float64
-	UUID       string
-	ParentUUID *string
+	ID        int64
+	URL       string
+	Title     string
+	Status    Status
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

@@ -24,33 +24,42 @@ var pgSql = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 const (
 	tasksTbl = "tasks"
 
-	idCol                  = "id"
-	queryCol               = "query"
-	statusCol              = "status"
-	createdAtCol           = "created_at"
-	updatedAtCol           = "updated_at"
-	processedAtCol         = "processed_at"
-	depthLevelCol          = "depth_level"
-	minWeightCol           = "min_weight"
-	maxSources             = "max_sources"
-	maxNeighboursForSource = "max_neighbours_for_source"
-
-	defaultDepthLevelCol          = 3
-	defaultMinWeightCol           = 0
-	defaultMaxSources             = 20
-	defaultMaxNeighboursForSource = 5
+	idCol                     = "id"
+	queryCol                  = "query"
+	statusCol                 = "status"
+	createdAtCol              = "created_at"
+	updatedAtCol              = "updated_at"
+	processedAtCol            = "processed_at"
+	depthLevelCol             = "depth_level"
+	minWeightCol              = "min_weight"
+	maxSourcesCol             = "max_sources"
+	maxNeighboursForSourceCol = "max_neighbours_for_source"
 )
 
-var readColumns = []string{idCol, queryCol, statusCol, createdAtCol, updatedAtCol, depthLevelCol, minWeightCol}
+var readColumns = []string{
+	idCol,
+	queryCol,
+	statusCol,
+	createdAtCol,
+	updatedAtCol,
+	processedAtCol,
+	depthLevelCol,
+	minWeightCol,
+	maxSourcesCol,
+	maxNeighboursForSourceCol,
+}
 
 type taskPG struct {
-	ID         int64     `db:"id"`
-	Query      string    `db:"query"`
-	Status     string    `db:"status"`
-	CreatedAt  time.Time `db:"created_at"`
-	UpdatedAt  time.Time `db:"updated_at"`
-	DepthLevel int       `db:"depth_level"`
-	MinWeight  float64   `db:"min_weight"`
+	ID                     int64      `db:"id"`
+	Query                  string     `db:"query"`
+	Status                 string     `db:"status"`
+	CreatedAt              time.Time  `db:"created_at"`
+	UpdatedAt              time.Time  `db:"updated_at"`
+	ProcessedAt            *time.Time `db:"processed_at"`
+	DepthLevel             int        `db:"depth_level"`
+	MinWeight              float64    `db:"min_weight"`
+	MaxSources             int64      `db:"max_sources"`
+	MaxNeighboursForSource int64      `db:"max_neighbours_for_source"`
 }
 
 func NewStorage(db *sqlx.DB) *Storage {
@@ -99,14 +108,18 @@ func (s *Storage) Create(ctx context.Context, params storage.ToCreateTask) (int6
 			updatedAtCol,
 			depthLevelCol,
 			minWeightCol,
+			maxSourcesCol,
+			maxNeighboursForSourceCol,
 		).
 		Values(
 			params.Query,
 			task.StatusCreated,
 			now,
 			now,
-			defaultDepthLevelCol,
-			defaultMinWeightCol,
+			params.DepthLevel,
+			params.MinWeight,
+			params.MaxSources,
+			params.MaxNeighboursForSource,
 		).
 		Suffix(returning(idCol)).
 		MustSql()
@@ -120,6 +133,7 @@ func (s *Storage) SetStatus(ctx context.Context, id int64, status task.Status) e
 	sql, args := pgSql.
 		Update(tasksTbl).
 		Set(statusCol, status).
+		Set(updatedAtCol, time.Now()).
 		Where(squirrel.Eq{idCol: id}).
 		MustSql()
 
@@ -142,13 +156,16 @@ func (s *Storage) SetStatus(ctx context.Context, id int64, status task.Status) e
 
 func mapFromPG(pg taskPG) task.Task {
 	return task.Task{
-		ID:         pg.ID,
-		Query:      pg.Query,
-		Status:     task.Status(pg.Status),
-		CreatedAt:  pg.CreatedAt,
-		UpdatedAt:  pg.UpdatedAt,
-		DepthLevel: pg.DepthLevel,
-		MinWeight:  pg.MinWeight,
+		ID:                     pg.ID,
+		Query:                  pg.Query,
+		Status:                 task.Status(pg.Status),
+		CreatedAt:              pg.CreatedAt,
+		UpdatedAt:              pg.UpdatedAt,
+		ProcessedAt:            pg.ProcessedAt,
+		DepthLevel:             pg.DepthLevel,
+		MinWeight:              pg.MinWeight,
+		MaxSources:             pg.MaxSources,
+		MaxNeighboursForSource: pg.MaxNeighboursForSource,
 	}
 }
 

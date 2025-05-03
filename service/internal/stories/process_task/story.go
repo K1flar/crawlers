@@ -11,27 +11,27 @@ import (
 )
 
 type Story struct {
-	log     *slog.Logger
-	storage storage.Tasks
-	crawler services.Crawler
+	log          *slog.Logger
+	tasksStorage storage.Tasks
+	crawler      services.Crawler
 }
 
 func NewStory(
 	log *slog.Logger,
-	storage storage.Tasks,
+	tasksStorage storage.Tasks,
 	crawler services.Crawler,
 ) *Story {
 	return &Story{
-		log:     log,
-		storage: storage,
-		crawler: crawler,
+		log:          log,
+		tasksStorage: tasksStorage,
+		crawler:      crawler,
 	}
 }
 
 func (s *Story) Process(ctx context.Context, id int64) error {
 	s.log.Info(fmt.Sprintf("start to process task [%d]", id))
 
-	task, err := s.storage.GetByID(ctx, id)
+	task, err := s.tasksStorage.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -40,5 +40,11 @@ func (s *Story) Process(ctx context.Context, id int64) error {
 		return fmt.Errorf("task [%d] is not in active status (%s)", task.ID, task.Status)
 	}
 
-	return s.crawler.Start(ctx, task)
+	pages, err := s.crawler.Start(ctx, task)
+
+	for url, page := range pages {
+		fmt.Println(url, page.Status)
+	}
+
+	return err
 }
