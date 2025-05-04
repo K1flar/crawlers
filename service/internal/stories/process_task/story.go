@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	task_model "github.com/K1flar/crawlers/internal/models/task"
 	"github.com/K1flar/crawlers/internal/services"
@@ -11,20 +12,28 @@ import (
 )
 
 type Story struct {
-	log          *slog.Logger
-	tasksStorage storage.Tasks
-	crawler      services.Crawler
+	log                *slog.Logger
+	tasksStorage       storage.Tasks
+	taskSourcesStorage storage.TaskSources
+	launcher           services.Launcher
+	crawler            services.Crawler
+	now                func() time.Time
 }
 
 func NewStory(
 	log *slog.Logger,
 	tasksStorage storage.Tasks,
+	taskSourcesStorage storage.TaskSources,
+	launcher services.Launcher,
 	crawler services.Crawler,
 ) *Story {
 	return &Story{
-		log:          log,
-		tasksStorage: tasksStorage,
-		crawler:      crawler,
+		log:                log,
+		tasksStorage:       tasksStorage,
+		taskSourcesStorage: taskSourcesStorage,
+		launcher:           launcher,
+		crawler:            crawler,
+		now:                time.Now,
 	}
 }
 
@@ -40,11 +49,20 @@ func (s *Story) Process(ctx context.Context, id int64) error {
 		return fmt.Errorf("task [%d] is not in active status (%s)", task.ID, task.Status)
 	}
 
+	launchID, err := s.launcher.Start(ctx, id)
+	if err != nil {
+		return err
+	}
+	s.log.Info(fmt.Sprintf("new launch with id [%d]", launchID))
+
 	pages, err := s.crawler.Start(ctx, task)
 
-	for url, page := range pages {
-		fmt.Println(url, page.Status)
-	}
+	err = s.launcher.Finish(ctx, services.LaunhToFinishParams{
+		LaunchID: launchID,
+		Task:     task,
+		Pages:    pages,
+		Error:    err,
+	})
 
 	return err
 }

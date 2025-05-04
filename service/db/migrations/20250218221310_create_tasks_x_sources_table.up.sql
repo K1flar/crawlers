@@ -6,4 +6,6 @@ CREATE TABLE IF NOT EXISTS tasks_x_sources (
     weight FLOAT NOT NULL,
 
     PRIMARY KEY (task_id, launch_id, source_id)
-)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_x_sources_task_id ON tasks_x_sources(task_id);

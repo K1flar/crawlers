@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 
+	"github.com/K1flar/crawlers/internal/models/launch"
 	"github.com/K1flar/crawlers/internal/models/source"
 	"github.com/K1flar/crawlers/internal/models/task"
 )
@@ -15,6 +16,18 @@ type Tasks interface {
 }
 
 type Sources interface {
+	Create(ctx context.Context, params []ToCreateSource) (map[string]int64, error)
+	Update(ctx context.Context, params []ToUpdateSource) (map[string]int64, error)
+	GetByURLs(ctx context.Context, urls []string) (map[string]source.Source, error)
+}
+
+type TaskSources interface {
+	Create(ctx context.Context, params []ToCreateTaskSource) error
 	GetByTaskID(ctx context.Context, taskID int64) ([]source.Source, error)
-	Create(ctx context.Context, params []ToCreateSource) ([]int64, error)
+}
+
+type Launches interface {
+	Create(ctx context.Context, params ToCreateLaunch) (int64, error)
+	Finish(ctx context.Context, params ToFinishLaunch) error
+	Get(ctx context.Context, id int64) (launch.Launch, error)
 }

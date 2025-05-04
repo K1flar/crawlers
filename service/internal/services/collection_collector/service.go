@@ -18,7 +18,7 @@ const (
 
 type Service struct {
 	terms      map[string]struct{}          // список терминов
-	collection map[string]document.Document // коллекция документов по UUID
+	collection map[string]document.Document // коллекция документов по URL
 	df         map[string]int               // количество документов, содержащих определенный термин
 	avgSize    float64                      // средний размер документов
 	totalSize  int64                        // общий размер слов в коллекции
@@ -38,7 +38,7 @@ func New(q string) *Service {
 	}
 }
 
-func (s *Service) AddPage(uuid string, page page.Page) {
+func (s *Service) AddPage(url string, page page.Page) {
 	words := strings.Split(page.Body, " ")
 	size := int64(len(words))
 
@@ -56,8 +56,8 @@ func (s *Service) AddPage(uuid string, page page.Page) {
 	}
 
 	s.mu.Lock()
-	s.collection[uuid] = document.Document{
-		UUID: uuid,
+	s.collection[url] = document.Document{
+		URL:  url,
 		Size: size,
 		TF:   tf,
 	}
@@ -74,8 +74,8 @@ func (s *Service) AddPage(uuid string, page page.Page) {
 }
 
 // idf https://habr.com/ru/articles/840268/
-func (s *Service) BM25(uuid string) (float64, bool) {
-	doc, ok := s.collection[uuid]
+func (s *Service) BM25(url string) (float64, bool) {
+	doc, ok := s.collection[url]
 	if !ok {
 		return 0, false
 	}

@@ -42,7 +42,6 @@ func (c *crawlerInstance) start(ctx context.Context, urls []string) error {
 		url := url
 		c.incPending()
 		c.wp.Submit(func() {
-			fmt.Println("get ", url)
 			page, _ := c.webScraper.GetPage(ctx, url)
 
 			c.crawlerTasks <- crawlerTask{

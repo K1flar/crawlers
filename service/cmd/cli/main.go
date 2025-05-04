@@ -16,6 +16,10 @@ import (
 	"github.com/K1flar/crawlers/internal/message_broker/kafka"
 	"github.com/K1flar/crawlers/internal/message_broker/messages"
 	"github.com/K1flar/crawlers/internal/services/crawler"
+	"github.com/K1flar/crawlers/internal/services/launcher"
+	"github.com/K1flar/crawlers/internal/storage/launches"
+	"github.com/K1flar/crawlers/internal/storage/sources"
+	"github.com/K1flar/crawlers/internal/storage/task_sources"
 	"github.com/K1flar/crawlers/internal/storage/tasks"
 	"github.com/K1flar/crawlers/internal/stories/process_task"
 	"github.com/K1flar/crawlers/internal/stories/produce_tasks_to_process"
@@ -105,7 +109,9 @@ func main() {
 
 	// Storages
 	tasksStorage := tasks.NewStorage(db)
-	// sourcesStorage := sources.NewStorage(db)
+	taskSourcesStorage := task_sources.NewStorage(db)
+	sourcesStorage := sources.NewStorage(db)
+	launchesStorage := launches.NewStorage(db)
 
 	// Gates
 	sxGate := searx.NewGate(log, searxClient)
@@ -113,10 +119,11 @@ func main() {
 
 	// Services
 	crawler := crawler.New(log, sxGate, webScraperGate)
+	launcher := launcher.NewService(log, launchesStorage, taskSourcesStorage, sourcesStorage)
 
 	// Stories
 	produceAllActiveTasksToProcessStory := produce_tasks_to_process.NewStory(tasksStorage, producer)
-	processTaskStory := process_task.NewStory(log, tasksStorage, crawler)
+	processTaskStory := process_task.NewStory(log, tasksStorage, taskSourcesStorage, launcher, crawler)
 
 	// Actions
 	tasksToProcessProducer := produce_tasks_to_process_action.NewAction(log, produceAllActiveTasksToProcessStory)

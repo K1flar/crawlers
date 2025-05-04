@@ -48,7 +48,7 @@ func (a *Action) Run(ctx context.Context) {
 			defer wg.Done()
 			err := a.story.Process(ctx, msg.ID)
 			if err != nil {
-				a.log.Error(fmt.Sprintf("failed to consume task to process: %s", err.Error()))
+				a.log.Error(fmt.Sprintf("failed to process task [%d]: %s", msg.ID, err.Error()))
 			}
 		}()
 	}

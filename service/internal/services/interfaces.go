@@ -12,6 +12,11 @@ type Crawler interface {
 }
 
 type CollectionCollector interface {
-	AddPage(uuid string, page page.Page)
-	BM25(uuid string) (float64, bool)
+	AddPage(url string, page page.Page)
+	BM25(url string) (float64, bool)
+}
+
+type Launcher interface {
+	Start(ctx context.Context, taskID int64) (int64, error)
+	Finish(ctx context.Context, params LaunhToFinishParams) error
 }
