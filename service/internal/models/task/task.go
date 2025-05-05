@@ -25,3 +25,10 @@ type Task struct {
 	MaxSources             int64
 	MaxNeighboursForSource int64
 }
+
+type ForList struct {
+	ID           int64
+	Query        string
+	Status       Status
+	CountSources int64
+}

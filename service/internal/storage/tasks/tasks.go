@@ -35,6 +35,8 @@ const (
 	minWeightCol              = "min_weight"
 	maxSourcesCol             = "max_sources"
 	maxNeighboursForSourceCol = "max_neighbours_for_source"
+
+	countSourcesCol = "count_sources"
 )
 
 var readColumns = []string{
@@ -63,6 +65,13 @@ type taskPG struct {
 	MaxNeighboursForSource int64      `db:"max_neighbours_for_source"`
 }
 
+type taskForListPG struct {
+	ID           int64  `db:"id"`
+	Query        string `db:"query"`
+	Status       string `db:"status"`
+	CountSources int64  `db:"count_sources"`
+}
+
 func NewStorage(db *sqlx.DB) *Storage {
 	return &Storage{db}
 }
@@ -79,6 +88,42 @@ func (s *Storage) GetByID(ctx context.Context, id int64) (task.Task, error) {
 	err := s.db.GetContext(ctx, &task, sql, args...)
 
 	return mapFromPG(task), err
+}
+
+func (s *Storage) GetForList(ctx context.Context, filter storage.FilterTaskForList) ([]task.ForList, error) {
+	var res []taskForListPG
+
+	q := pgSql.
+		Select("t.id", "t.query", "t.status", "count(txs.source_id) as count_sources").
+		From("tasks t").
+		Join("tasks_x_sources txs ON t.id = txs.task_id").
+		GroupBy("t.id")
+
+	if filter.Status != nil {
+		q = q.Where(squirrel.Eq{"t.status": *filter.Status})
+	}
+
+	if filter.Query != nil {
+		q = q.Where(squirrel.Like{"t.query": fmt.Sprintf("%%%s%%", *filter.Query)})
+	}
+
+	sql, args := q.Limit(uint64(filter.Limit)).
+		Offset(uint64(filter.Offset)).
+		MustSql()
+
+	fmt.Println(sql)
+	fmt.Println(args)
+
+	err := s.db.SelectContext(ctx, &res, sql, args...)
+
+	return lo.Map(res, func(pg taskForListPG, _ int) task.ForList {
+		return task.ForList{
+			ID:           pg.ID,
+			Query:        pg.Query,
+			Status:       task.Status(pg.Status),
+			CountSources: pg.CountSources,
+		}
+	}), err
 }
 
 func (s *Storage) FindInStatuses(ctx context.Context, statuses []task.Status) ([]task.Task, error) {

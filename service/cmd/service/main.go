@@ -10,6 +10,7 @@ import (
 	api_create_task "github.com/K1flar/crawlers/internal/handlers/create_task"
 	api_get_sources "github.com/K1flar/crawlers/internal/handlers/get_sources"
 	api_get_task "github.com/K1flar/crawlers/internal/handlers/get_task"
+	api_get_tasks "github.com/K1flar/crawlers/internal/handlers/get_tasks"
 	api_stop_task "github.com/K1flar/crawlers/internal/handlers/stop_task"
 	api_update_task "github.com/K1flar/crawlers/internal/handlers/update_task"
 	"github.com/K1flar/crawlers/internal/message_broker/kafka"
@@ -87,6 +88,7 @@ func main() {
 	mux.Handle("POST /stop-task", corsMW(http.HandlerFunc(api_stop_task.New(log, tasksStorage).Handle)))
 	mux.Handle("POST /activate-task", corsMW(http.HandlerFunc(api_activate_task.New(log, tasksStorage, producerTasksToProcess).Handle)))
 	mux.Handle("POST /update-task", corsMW(http.HandlerFunc(api_update_task.New(log, tasksStorage).Handle)))
+	mux.Handle("POST /get-tasks", corsMW(http.HandlerFunc(api_get_tasks.New(log, tasksStorage).Handle)))
 
 	log.Info(fmt.Sprintf("Starting server on %s:%s", os.Getenv(serviceHost), os.Getenv(servicePort)))
 	if err := http.ListenAndServe(os.Getenv(serviceHost)+":"+os.Getenv(servicePort), mux); err != nil {

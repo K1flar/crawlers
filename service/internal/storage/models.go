@@ -5,6 +5,7 @@ import (
 
 	"github.com/K1flar/crawlers/internal/models/launch"
 	"github.com/K1flar/crawlers/internal/models/source"
+	"github.com/K1flar/crawlers/internal/models/task"
 )
 
 type ToCreateTask struct {
@@ -21,6 +22,13 @@ type ToUpdateTask struct {
 	MinWeight              *float64
 	MaxSources             *int64
 	MaxNeighboursForSource *int64
+}
+
+type FilterTaskForList struct {
+	Limit  int64
+	Offset int64
+	Status *task.Status
+	Query  *string
 }
 
 type ToCreateSource struct {
