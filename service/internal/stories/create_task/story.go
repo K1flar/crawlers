@@ -9,7 +9,6 @@ import (
 	"github.com/K1flar/crawlers/internal/business_errors"
 	"github.com/K1flar/crawlers/internal/message_broker"
 	"github.com/K1flar/crawlers/internal/message_broker/messages"
-	"github.com/K1flar/crawlers/internal/models/task"
 	"github.com/K1flar/crawlers/internal/storage"
 )
 
@@ -49,11 +48,6 @@ func (s *Story) Create(ctx context.Context, query string) (int64, error) {
 		MaxSources:             defaultMaxSources,
 		MaxNeighboursForSource: defaultMaxNeighboursForSource,
 	})
-	if err != nil {
-		return 0, err
-	}
-
-	err = s.tasks.SetStatus(ctx, id, task.StatusActive)
 	if err != nil {
 		return 0, err
 	}

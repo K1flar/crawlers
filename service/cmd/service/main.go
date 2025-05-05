@@ -6,10 +6,17 @@ import (
 	"net/http"
 	"os"
 
+	api_activate_task "github.com/K1flar/crawlers/internal/handlers/activate_task"
 	api_create_task "github.com/K1flar/crawlers/internal/handlers/create_task"
+	api_get_sources "github.com/K1flar/crawlers/internal/handlers/get_sources"
+	api_get_task "github.com/K1flar/crawlers/internal/handlers/get_task"
+	api_stop_task "github.com/K1flar/crawlers/internal/handlers/stop_task"
+	api_update_task "github.com/K1flar/crawlers/internal/handlers/update_task"
 	"github.com/K1flar/crawlers/internal/message_broker/kafka"
 	"github.com/K1flar/crawlers/internal/message_broker/messages"
 	"github.com/K1flar/crawlers/internal/middlewares/cors"
+	"github.com/K1flar/crawlers/internal/storage/launches"
+	"github.com/K1flar/crawlers/internal/storage/sources"
 	"github.com/K1flar/crawlers/internal/storage/tasks"
 	"github.com/K1flar/crawlers/internal/stories/create_task"
 	"github.com/jmoiron/sqlx"
@@ -51,7 +58,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	tasks := tasks.NewStorage(db)
+	// Storage
+	tasksStorage := tasks.NewStorage(db)
+	sourcesStorage := sources.NewStorage(db)
+	launchesStorage := launches.NewStorage(db)
 
 	kafkaBrokers := []string{
 		fmt.Sprintf("%s:%s", os.Getenv(kafkaHost), os.Getenv(kafkaPort)),
@@ -59,7 +69,7 @@ func main() {
 
 	producerTasksToProcess := kafka.NewProducer[messages.TaskToProcessMessage](kafkaBrokers, os.Getenv(tasksToProcessTopic))
 
-	createTaskStory := create_task.NewStory(log, tasks, producerTasksToProcess)
+	createTaskStory := create_task.NewStory(log, tasksStorage, producerTasksToProcess)
 
 	mux := http.NewServeMux()
 
@@ -72,6 +82,11 @@ func main() {
 	})
 
 	mux.Handle("POST /create-task", corsMW(http.HandlerFunc(api_create_task.New(log, createTaskStory).Handle)))
+	mux.Handle("POST /get-task", corsMW(http.HandlerFunc(api_get_task.New(log, tasksStorage, launchesStorage).Handle)))
+	mux.Handle("POST /get-sources", corsMW(http.HandlerFunc(api_get_sources.New(log, sourcesStorage).Handle)))
+	mux.Handle("POST /stop-task", corsMW(http.HandlerFunc(api_stop_task.New(log, tasksStorage).Handle)))
+	mux.Handle("POST /activate-task", corsMW(http.HandlerFunc(api_activate_task.New(log, tasksStorage, producerTasksToProcess).Handle)))
+	mux.Handle("POST /update-task", corsMW(http.HandlerFunc(api_update_task.New(log, tasksStorage).Handle)))
 
 	log.Info(fmt.Sprintf("Starting server on %s:%s", os.Getenv(serviceHost), os.Getenv(servicePort)))
 	if err := http.ListenAndServe(os.Getenv(serviceHost)+":"+os.Getenv(servicePort), mux); err != nil {

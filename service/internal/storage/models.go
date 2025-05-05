@@ -15,6 +15,14 @@ type ToCreateTask struct {
 	MaxNeighboursForSource int64
 }
 
+type ToUpdateTask struct {
+	ID                     int64
+	DepthLevel             *int
+	MinWeight              *float64
+	MaxSources             *int64
+	MaxNeighboursForSource *int64
+}
+
 type ToCreateSource struct {
 	Title     string
 	URL       string

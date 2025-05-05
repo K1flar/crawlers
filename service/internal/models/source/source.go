@@ -17,3 +17,11 @@ type Source struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+type ForTask struct {
+	ID       int64
+	URL      string
+	Title    string
+	Weight   float64
+	ParentID *int64
+}

@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -136,6 +137,62 @@ func (s *Storage) SetStatus(ctx context.Context, id int64, status task.Status) e
 		Set(updatedAtCol, time.Now()).
 		Where(squirrel.Eq{idCol: id}).
 		MustSql()
+
+	res, err := s.db.ExecContext(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return business_errors.EntityNotFound
+	}
+
+	return nil
+}
+
+func (s *Storage) Process(ctx context.Context, id int64) error {
+	sql, args := pgSql.
+		Update(tasksTbl).
+		Set(statusCol, task.StatusInPocessing).
+		Set(processedAtCol, time.Now()).
+		Where(squirrel.Eq{idCol: id}).
+		MustSql()
+
+	res, err := s.db.ExecContext(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return business_errors.EntityNotFound
+	}
+
+	return nil
+}
+
+func (s *Storage) Update(ctx context.Context, params storage.ToUpdateTask) error {
+	sql, args := pgSql.
+		Update(tasksTbl).
+		Set(updatedAtCol, time.Now()).
+		Set(depthLevelCol, squirrel.Expr("coalesce(?, depth_level)", params.DepthLevel)).
+		Set(minWeightCol, squirrel.Expr("coalesce(?, min_weight)", params.MinWeight)).
+		Set(maxSourcesCol, squirrel.Expr("coalesce(?, max_sources)", params.MaxSources)).
+		Set(maxNeighboursForSourceCol, squirrel.Expr("coalesce(?, max_neighbours_for_source)", params.MaxNeighboursForSource)).
+		Where(squirrel.Eq{idCol: params.ID}).
+		MustSql()
+
+	fmt.Println(sql)
+	fmt.Println(args)
 
 	res, err := s.db.ExecContext(ctx, sql, args...)
 	if err != nil {

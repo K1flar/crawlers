@@ -22,7 +22,8 @@ type Storage struct {
 var pgSql = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 
 const (
-	sourcesTbl = "sources"
+	sourcesTbl  = "sources"
+	launchesTbl = "launches"
 
 	idCol        = "id"
 	titleCol     = "title"
@@ -136,6 +137,40 @@ func (s *Storage) GetByURLs(ctx context.Context, urls []string) (map[string]sour
 	return lo.SliceToMap(res, func(source sourcePG) (string, source.Source) {
 		return source.URL, mapFromPG(source)
 	}), nil
+}
+
+type taskSourcePG struct {
+	ID       int64   `db:"id"`
+	URL      string  `db:"url"`
+	Title    string  `db:"title"`
+	Weight   float64 `db:"weight"`
+	ParentID *int64  `db:"parent_source_id"`
+}
+
+func (s *Storage) GetByTaskID(ctx context.Context, taskID int64) ([]source.ForTask, error) {
+	var res []taskSourcePG
+
+	subSql := squirrel.Expr("txs.launch_id = (SELECT MAX(id) FROM launches WHERE task_id = ?)", taskID)
+
+	sql, args := pgSql.
+		Select("s.id", "s.title", "s.url", "txs.weight", "txs.parent_source_id").
+		From("sources s").
+		Join("tasks_x_sources txs ON s.id = txs.source_id").
+		Where(squirrel.Eq{"txs.task_id": taskID}).
+		Where(subSql).
+		MustSql()
+
+	err := s.db.SelectContext(ctx, &res, sql, args...)
+
+	return lo.Map(res, func(pg taskSourcePG, _ int) source.ForTask {
+		return source.ForTask{
+			ID:       pg.ID,
+			URL:      pg.URL,
+			Title:    pg.Title,
+			Weight:   pg.Weight,
+			ParentID: pg.ParentID,
+		}
+	}), err
 }
 
 func mapFromPGMany(sources []sourcePG) []source.Source {

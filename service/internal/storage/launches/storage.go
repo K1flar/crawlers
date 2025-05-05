@@ -128,6 +128,26 @@ func (s *Storage) Get(ctx context.Context, id int64) (launch.Launch, error) {
 	return mapFromPG(res), err
 }
 
+func (s *Storage) GetLastByTaskID(ctx context.Context, taskID int64) (launch.Launch, error) {
+	var res launchPG
+
+	subSql, subArgs := pgSql.
+		Select("max(id)").
+		From(launchesTbl).
+		Where(squirrel.Eq{taskIDCol: taskID}).
+		MustSql()
+
+	sql, args := pgSql.
+		Select(readColumns...).
+		From(launchesTbl).
+		Where("id = ("+subSql+")", subArgs...).
+		MustSql()
+
+	err := s.db.GetContext(ctx, &res, sql, args...)
+
+	return mapFromPG(res), err
+}
+
 func mapFromPG(pg launchPG) launch.Launch {
 	return launch.Launch{
 		ID:            pg.ID,

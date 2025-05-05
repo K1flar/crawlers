@@ -45,8 +45,13 @@ func (s *Story) Process(ctx context.Context, id int64) error {
 		return err
 	}
 
-	if task.Status != task_model.StatusActive {
-		return fmt.Errorf("task [%d] is not in active status (%s)", task.ID, task.Status)
+	if task.Status != task_model.StatusCreated && task.Status != task_model.StatusActive {
+		return fmt.Errorf("task [%d] is not in created or active status (%s)", task.ID, task.Status)
+	}
+
+	err = s.tasksStorage.Process(ctx, id)
+	if err != nil {
+		return err
 	}
 
 	launchID, err := s.launcher.Start(ctx, id)
@@ -55,13 +60,23 @@ func (s *Story) Process(ctx context.Context, id int64) error {
 	}
 	s.log.Info(fmt.Sprintf("new launch with id [%d]", launchID))
 
-	pages, err := s.crawler.Start(ctx, task)
+	pages, crawlerErr := s.crawler.Start(ctx, task)
+
+	newStatus := task_model.StatusActive
+	if crawlerErr != nil {
+		newStatus = task_model.StatusStoppedWithError
+	}
+
+	err = s.tasksStorage.SetStatus(ctx, id, newStatus)
+	if err != nil {
+		return err
+	}
 
 	err = s.launcher.Finish(ctx, services.LaunhToFinishParams{
 		LaunchID: launchID,
 		Task:     task,
 		Pages:    pages,
-		Error:    err,
+		Error:    crawlerErr,
 	})
 
 	return err

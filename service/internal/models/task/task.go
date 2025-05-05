@@ -7,7 +7,7 @@ type Status string
 const (
 	StatusCreated          Status = "created"
 	StatusActive           Status = "active"
-	StatusProcessed        Status = "processed"
+	StatusInPocessing      Status = "in_processing"
 	StatusStopped          Status = "stopped"
 	StatusStoppedWithError Status = "stopped_with_error"
 	StatusInactive         Status = "inactive"
