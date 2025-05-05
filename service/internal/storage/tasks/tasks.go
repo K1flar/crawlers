@@ -111,9 +111,6 @@ func (s *Storage) GetForList(ctx context.Context, filter storage.FilterTaskForLi
 		Offset(uint64(filter.Offset)).
 		MustSql()
 
-	fmt.Println(sql)
-	fmt.Println(args)
-
 	err := s.db.SelectContext(ctx, &res, sql, args...)
 
 	return lo.Map(res, func(pg taskForListPG, _ int) task.ForList {
@@ -235,9 +232,6 @@ func (s *Storage) Update(ctx context.Context, params storage.ToUpdateTask) error
 		Set(maxNeighboursForSourceCol, squirrel.Expr("coalesce(?, max_neighbours_for_source)", params.MaxNeighboursForSource)).
 		Where(squirrel.Eq{idCol: params.ID}).
 		MustSql()
-
-	fmt.Println(sql)
-	fmt.Println(args)
 
 	res, err := s.db.ExecContext(ctx, sql, args...)
 	if err != nil {
