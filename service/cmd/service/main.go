@@ -8,6 +8,7 @@ import (
 
 	api_activate_task "github.com/K1flar/crawlers/internal/handlers/activate_task"
 	api_create_task "github.com/K1flar/crawlers/internal/handlers/create_task"
+	api_get_protocol "github.com/K1flar/crawlers/internal/handlers/get_protocol"
 	api_get_sources "github.com/K1flar/crawlers/internal/handlers/get_sources"
 	api_get_task "github.com/K1flar/crawlers/internal/handlers/get_task"
 	api_get_tasks "github.com/K1flar/crawlers/internal/handlers/get_tasks"
@@ -89,6 +90,7 @@ func main() {
 	mux.Handle("POST /activate-task", corsMW(http.HandlerFunc(api_activate_task.New(log, tasksStorage, producerTasksToProcess).Handle)))
 	mux.Handle("POST /update-task", corsMW(http.HandlerFunc(api_update_task.New(log, tasksStorage).Handle)))
 	mux.Handle("POST /get-tasks", corsMW(http.HandlerFunc(api_get_tasks.New(log, tasksStorage).Handle)))
+	mux.Handle("POST /get-protocol", corsMW(http.HandlerFunc(api_get_protocol.New(log, sourcesStorage).Handle)))
 
 	log.Info(fmt.Sprintf("Starting server on %s:%s", os.Getenv(serviceHost), os.Getenv(servicePort)))
 	if err := http.ListenAndServe(os.Getenv(serviceHost)+":"+os.Getenv(servicePort), mux); err != nil {

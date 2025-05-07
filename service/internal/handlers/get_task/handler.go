@@ -38,7 +38,7 @@ type dtoResponse struct {
 	ProcessedAt            *time.Time     `json:"processedAt"`
 	SourcesViewed          *int64         `json:"sourcesViewed"`
 	LaunchDuration         *time.Duration `json:"launchDuration"`
-	ErrorSlug              *string        `json:"errorSlug"`
+	ErrorMsg               *string        `json:"errorSlug"`
 	DepthLevel             int            `json:"depthLevel"`
 	MinWeight              float64        `json:"minWeight"`
 	MaxSources             int64          `json:"maxSources"`
@@ -90,7 +90,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 
 		res.SourcesViewed = &launch.SourcesViewed
 		res.LaunchDuration = utils.Ptr(launch.FinishedAt.Sub(launch.StartedAt))
-		res.ErrorSlug = (*string)(launch.Error)
+		res.ErrorMsg = common.ErrorSlugToMsg(launch.Error)
 	}
 
 	common.OK(w, res)

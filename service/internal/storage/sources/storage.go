@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/K1flar/crawlers/internal/models/launch"
 	"github.com/K1flar/crawlers/internal/models/source"
 	"github.com/K1flar/crawlers/internal/storage"
+	"github.com/K1flar/crawlers/internal/utils"
 	"github.com/Masterminds/squirrel"
 	"github.com/jmoiron/sqlx"
 	"github.com/samber/lo"
@@ -23,6 +25,7 @@ var pgSql = squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 
 const (
 	sourcesTbl  = "sources"
+	tasksTbl    = "tasks"
 	launchesTbl = "launches"
 
 	idCol        = "id"
@@ -169,6 +172,85 @@ func (s *Storage) GetByTaskID(ctx context.Context, taskID int64) ([]source.ForTa
 			Title:    pg.Title,
 			Weight:   pg.Weight,
 			ParentID: pg.ParentID,
+		}
+	}), err
+}
+
+type sourceForProtocolPG struct {
+	TaskID          int64      `db:"task_id"`
+	Query           string     `db:"query"`
+	SourceID        int64      `db:"source_id"`
+	Title           string     `db:"title"`
+	URL             string     `db:"url"`
+	CreatedAt       time.Time  `db:"created_at"`
+	UpdatedAt       time.Time  `db:"updated_at"`
+	SourceStatus    string     `db:"source_status"`
+	LaunchID        int64      `db:"launch_id"`
+	LaunchNumber    int64      `db:"launch_number"`
+	StartedAt       time.Time  `db:"started_at"`
+	FinishedAt      *time.Time `db:"finished_at"`
+	LaunchStatus    string     `db:"launch_status"`
+	LaunchErrorSlug *string    `db:"error"`
+}
+
+func (s *Storage) GetForProtocol(ctx context.Context, filter storage.FilterForProtocol) ([]source.ForProtocol, error) {
+	var res []sourceForProtocolPG
+
+	q := pgSql.
+		Select("t.id as task_id", "t.query",
+			"s.id as source_id", "s.title", "s.url", "s.created_at", "s.updated_at", "s.status as source_status",
+			"l.id as launch_id", "l.number as launch_number", "l.started_at",
+			"finished_at", "l.status as launch_status", "l.error").
+		From("sources s").
+		Join("tasks_x_sources txs ON s.id = txs.source_id").
+		Join("tasks t ON t.id = txs.task_id").
+		Join("launches l ON t.id = l.task_id")
+
+	if filter.TaskID != nil {
+		q = q.Where(squirrel.Eq{"t.id": filter.TaskID})
+	}
+
+	if filter.Query != nil {
+		q = q.Where(squirrel.Like{"t.query": fmt.Sprintf("%%%s%%", *filter.Query)})
+	}
+
+	if filter.SourceID != nil {
+		q = q.Where(squirrel.Eq{"s.id": filter.SourceID})
+	}
+
+	if filter.Title != nil {
+		q = q.Where(squirrel.Like{"s.title": fmt.Sprintf("%%%s%%", *filter.Title)})
+	}
+
+	if filter.SourceStatus != nil {
+		q = q.Where(squirrel.Like{"s.status": fmt.Sprintf("%%%s%%", *filter.SourceStatus)})
+	}
+
+	sql, args := q.Limit(uint64(filter.Limit)).Offset(uint64(filter.Offset)).MustSql()
+
+	err := s.db.SelectContext(ctx, &res, sql, args...)
+
+	return lo.Map(res, func(s sourceForProtocolPG, _ int) source.ForProtocol {
+		var duration *time.Duration
+		if s.FinishedAt != nil {
+			duration = utils.Ptr(s.FinishedAt.Sub(s.StartedAt))
+		}
+
+		return source.ForProtocol{
+			TaskID:          s.TaskID,
+			Query:           s.Query,
+			SourceID:        s.SourceID,
+			Title:           s.Title,
+			URL:             s.URL,
+			CreatedAt:       s.CreatedAt,
+			UpdatedAt:       s.UpdatedAt,
+			SourceStatus:    source.Status(s.SourceStatus),
+			LaunchID:        s.LaunchID,
+			LaunchNumber:    s.LaunchNumber,
+			StartedAt:       s.StartedAt,
+			Duration:        duration,
+			LaunchStatus:    launch.Status(s.LaunchStatus),
+			LaunchErrorSlug: s.LaunchErrorSlug,
 		}
 	}), err
 }

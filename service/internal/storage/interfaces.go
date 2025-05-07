@@ -23,6 +23,7 @@ type Sources interface {
 	Update(ctx context.Context, params []ToUpdateSource) (map[string]int64, error)
 	GetByURLs(ctx context.Context, urls []string) (map[string]source.Source, error)
 	GetByTaskID(ctx context.Context, taskID int64) ([]source.ForTask, error)
+	GetForProtocol(ctx context.Context, filter FilterForProtocol) ([]source.ForProtocol, error)
 }
 
 type TaskSources interface {

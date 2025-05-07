@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/K1flar/crawlers/internal/business_errors"
 	"github.com/K1flar/crawlers/internal/gates"
 	"github.com/K1flar/crawlers/internal/models/page"
 	"github.com/K1flar/crawlers/internal/models/task"
@@ -42,7 +43,11 @@ func (c *Crawler) Start(ctx context.Context, task task.Task) (map[string]*page.P
 
 	urls, err := c.searchSystem.Search(ctx, task.Query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to search initial sources by query [%s]: %w", task.Query, err)
+		return nil, fmt.Errorf("%w: failed to search initial sources by query [%s]: %w", business_errors.SearxError, task.Query, err)
+	}
+
+	if len(urls) == 0 {
+		return nil, business_errors.ZeroStartSources
 	}
 
 	timeStart := c.now()

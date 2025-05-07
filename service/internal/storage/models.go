@@ -31,6 +31,16 @@ type FilterTaskForList struct {
 	Query  *string
 }
 
+type FilterForProtocol struct {
+	Limit        int64
+	Offset       int64
+	TaskID       *int64
+	Query        *string
+	SourceID     *int64
+	Title        *string
+	SourceStatus *source.Status
+}
+
 type ToCreateSource struct {
 	Title     string
 	URL       string

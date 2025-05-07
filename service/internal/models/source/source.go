@@ -1,6 +1,10 @@
 package source
 
-import "time"
+import (
+	"time"
+
+	"github.com/K1flar/crawlers/internal/models/launch"
+)
 
 type Status string
 
@@ -24,4 +28,21 @@ type ForTask struct {
 	Title    string
 	Weight   float64
 	ParentID *int64
+}
+
+type ForProtocol struct {
+	TaskID          int64
+	Query           string
+	SourceID        int64
+	Title           string
+	URL             string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	SourceStatus    Status
+	LaunchID        int64
+	LaunchNumber    int64
+	StartedAt       time.Time
+	Duration        *time.Duration
+	LaunchStatus    launch.Status
+	LaunchErrorSlug *string
 }
