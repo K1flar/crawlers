@@ -59,13 +59,6 @@ code {
   cursor: not-allowed;
 }
 
-.error-message {
-  background-color: rgba(255, 0, 0, 0.1); /* Красный с 30% прозрачностью */
-  padding: 15px;
-  border-radius: 5px;
-  color: #721c24; /* Темно-красный для текста */
-}
-
 /* Task page */
 
 .task-container {
@@ -141,4 +134,13 @@ code {
 .sources-loader {
   display: flex;
   justify-content: center;
+}
+
+.error-message {
+  background-color: rgba(255, 0, 0, 0.1); /* Красный с 30% прозрачностью */
+  padding: 15px!important;
+  font-size: 14px!important;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  color: #721c24; /* Темно-красный для текста */
 }

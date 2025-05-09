@@ -17,6 +17,7 @@ const HomePage = () => {
   const [newTaskQuery, setNewTaskQuery] = useState(''); // Новое состояние для ввода
   const [totalTasks, setTotalTasks] = useState(0);
   const navigate = useNavigate();
+  const [errorToCreateTask, setErrorToCreateTask] = useState('')
 
   const fetchTasks = async () => {
     setLoading(true);
@@ -54,6 +55,7 @@ const HomePage = () => {
       return;
     }
 
+    setErrorToCreateTask('')
     try {
       const response = await fetch('http://localhost:8080/create-task', {
         method: 'POST',
@@ -72,9 +74,14 @@ const HomePage = () => {
         setNewTaskQuery('');
         fetchTasks(); // Обновляем список задач
       } else {
-        throw new Error(data.error || 'Failed to create task');
+        if (response.status === 403) {
+          throw new Error(data.error || 'Ошибка при создании задачи, попрбуйте позже');
+        }
+
+        throw new Error('Ошибка при создании задачи, попрбуйте позже');
       }
     } catch (error) {
+      setErrorToCreateTask(error.message)
       message.error(error.message);
     }
   };
@@ -87,16 +94,19 @@ const HomePage = () => {
     <div className="home-container">
       <h1>Система администрирования поисковых роботов</h1>
       {/* Блок создания новой задачи */}
-      <div className="create-task-section">
-        <Input
-          placeholder="Введите новый поисковый запрос"
-          value={newTaskQuery}
-          onChange={(e) => setNewTaskQuery(e.target.value)}
-          style={{ width: 400, marginRight: 16 }}
-        />
-        <Button type="primary" onClick={createNewTask}>
-          Создать задачу
-        </Button>
+      <div>
+        <div className="create-task-section">
+          <Input
+            placeholder="Введите новый поисковый запрос"
+            value={newTaskQuery}
+            onChange={(e) => setNewTaskQuery(e.target.value)}
+            style={{ width: 400, marginRight: 16 }}
+          />
+          <Button type="primary" onClick={createNewTask}>
+            Создать задачу
+          </Button>
+        </div>
+        {errorToCreateTask && <div className="error-message">{errorToCreateTask}</div>}
       </div>
 
       {/* Блок фильтрации существующих задач */}
@@ -133,7 +143,7 @@ const HomePage = () => {
       ) : (
         <div className="tasks-list">
           {tasks.map(task => (
-            <TaskCard key={task.id} task={task}/>
+            <TaskCard key={task.id} task={task} />
           ))}
         </div>
       )}
