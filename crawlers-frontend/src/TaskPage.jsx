@@ -162,7 +162,7 @@ const TaskPage = () => {
 
       const data = await response.json();
       if (response.ok) {
-        const newSources = data.sources.map((e) => ({ ...e, title: e.title ?? task.query }))
+        const newSources = data.sources.map((e) => ({ ...e, title: e.title || task.query }))
         setSources(newSources || []);
       } else {
         throw new Error(data.error || 'Ошибка загрузки источников');
