@@ -2,7 +2,10 @@ package common
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+
+	"github.com/K1flar/crawlers/internal/business_errors"
 )
 
 func OK(w http.ResponseWriter, body any) {
@@ -46,4 +49,14 @@ func Forbidden(w http.ResponseWriter, code string, msg string) {
 func InternalError(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte(`{"error": "internal error"}`))
+}
+
+func Error(w http.ResponseWriter, err error) {
+	var businessError *business_errors.BusinessError
+	if errors.As(err, &businessError) {
+		Forbidden(w, businessError.Code, ErrorMsg(err))
+		return
+	}
+
+	InternalError(w)
 }

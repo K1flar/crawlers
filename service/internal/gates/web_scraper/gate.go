@@ -2,25 +2,18 @@ package web_scraper
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
-	"mime"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/K1flar/crawlers/internal/business_errors"
-	"github.com/K1flar/crawlers/internal/models/page"
-	"github.com/PuerkitoBio/goquery"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/text/encoding/charmap"
+	page_models "github.com/K1flar/crawlers/internal/models/page"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/chromedp"
+	"github.com/samber/lo"
 )
 
 const (
-	defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
-	defaultTimeout   = 2 * time.Second
+	defaultTimeout = 10 * time.Second
 
 	urlPattern = `^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$`
 )
@@ -29,89 +22,60 @@ var (
 	urlRegex = regexp.MustCompile(urlPattern)
 )
 
-type Gate struct {
-	client *http.Client
-}
+type Gate struct{}
 
 func NewGate() *Gate {
-	return &Gate{http.DefaultClient}
+	return &Gate{}
 }
 
-func (g *Gate) GetPage(ctx context.Context, url string) (page.Page, error) {
-	page := page.Page{}
-
+func (g *Gate) GetPage(ctx context.Context, url string) (*page_models.Page, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return page, err
+	allocCtx, allocCtxCancel := chromedp.NewContext(ctx)
+	defer allocCtxCancel()
+	defer chromedp.Cancel(allocCtx)
+
+	page := &page_models.Page{
+		URL:    url,
+		Status: page_models.StatusUnavailable,
 	}
 
-	req.Header.Set("User-Agent", defaultUserAgent)
+	var urls []string
 
-	res, err := g.client.Do(req)
-	if err != nil {
-		return page, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return page, business_errors.UnavailableSource
-	}
-
-	var reader io.Reader
-
-	_, params, _ := mime.ParseMediaType(res.Header.Get("Content-type"))
-	contentType := strings.ToLower(params["charset"])
-
-	switch contentType {
-	case "utf-8":
-		reader = res.Body
-	case "windows-1251":
-		reader = charmap.Windows1251.NewDecoder().Reader(res.Body)
-	case "iso-8859-1":
-		reader = charmap.ISO8859_1.NewDecoder().Reader(res.Body)
-	default:
-		return page, fmt.Errorf("unsopported content type")
-	}
-
-	doc, err := goquery.NewDocumentFromReader(reader)
-	if err != nil {
-		return page, err
-	}
-
-	errGrp, _ := errgroup.WithContext(ctx)
-
-	errGrp.Go(func() error {
-		page.Title = doc.Find("title").Text()
-
-		if page.Title == "" {
-			return errors.New("title must exist")
-		}
-
-		return nil
-	})
-
-	errGrp.Go(func() error {
-		doc.Find("a").Each(func(_ int, s *goquery.Selection) {
-			if url, exists := s.Attr("href"); exists {
-				if urlRegex.MatchString(url) {
-					page.URLs = append(page.URLs, url)
+	actions := []chromedp.Action{
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			chromedp.ListenTarget(ctx, func(ev any) {
+				if ev, ok := ev.(*network.EventResponseReceived); ok {
+					if ev.Response.URL == url || strings.HasPrefix(ev.Response.URL, url) {
+						if ev.Response.Status == 200 {
+							page.Status = page_models.StatusAvailable
+						}
+					}
 				}
-			}
-		})
+			})
+			return nil
+		}),
+		chromedp.Navigate(url),
+		chromedp.Title(&page.Title),
+		chromedp.OuterHTML("html", &page.Body),
+		// Получаем текущий URL (может отличаться от исходного из-за редиректов)
+		chromedp.Location(&page.URL),
+		chromedp.Evaluate(`
+			Array.from(document.querySelectorAll('a')).map(a => a.href);
+		`, &urls),
+	}
 
-		return nil
+	err := chromedp.Run(allocCtx, actions...)
+	if err != nil {
+		return nil, err
+	}
+
+	filteredURLs := lo.Filter(urls, func(url string, _ int) bool {
+		return len(url) != 0 && urlRegex.MatchString(url)
 	})
 
-	errGrp.Go(func() error {
-		page.Body, err = doc.Find("body").Html()
+	page.URLs = filteredURLs
 
-		return err
-	})
-
-	err = errGrp.Wait()
-
-	return page, err
+	return page, nil
 }

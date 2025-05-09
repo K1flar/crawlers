@@ -16,6 +16,9 @@ KAFKA_HOST = 127.0.0.1
 KAFKA_PORT = 9092
 KAFKA_TASKS_TOPIC = tasks-to-process
 
+MAX_COUNT_CRAWLERS = 10
+CRON_TASKS_TO_PROCESS_PRODUCER_PERIOD = 1s
+
 MIGRATE = docker run \
 	-v ${CURDIR}/$(MIGRATION_DIR):/migrations \
 	--network host \
@@ -42,6 +45,8 @@ env:
 	@echo KAFKA_HOST=$(KAFKA_HOST) >> .env 
 	@echo KAFKA_PORT=$(KAFKA_PORT) >> .env 
 	@echo KAFKA_TASKS_TOPIC=$(KAFKA_TASKS_TOPIC) >> .env
+	@echo MAX_COUNT_CRAWLERS=$(MAX_COUNT_CRAWLERS) >> .env
+	@echo CRON_TASKS_TO_PROCESS_PRODUCER_PERIOD=$(CRON_TASKS_TO_PROCESS_PRODUCER_PERIOD) >> .env
 	@echo Environment variables have been successfully created
 
 .PHONY: clean-env
@@ -87,11 +92,20 @@ kafka-start:
 create-tasks-topic: 
 	@docker exec -it kafka \
 	/opt/kafka/bin/kafka-topics.sh --create \
+	--if-not-exists \
 	--topic $(KAFKA_TASKS_TOPIC) \
-	--bootstrap-server localhost:9092 \
+	--bootstrap-server $(KAFKA_HOST):$(KAFKA_PORT) \
 	--partitions 1 \
 	--replication-factor 1
-	@echo Topic for start tasks is created
+	@echo Topic for process tasks is created
+	@docker exec -it kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server $(KAFKA_HOST):$(KAFKA_PORT) --describe
+
+.PHONY: reset-kafka
+reset-kafka:
+	@docker exec -it kafka \
+	/opt/kafka/bin/kafka-topics.sh --delete \
+	--bootstrap-server $(KAFKA_HOST):$(KAFKA_PORT) \
+	--topic $(KAFKA_TASKS_TOPIC)
 
 .PHONY: stop
 stop:
@@ -103,4 +117,4 @@ stop:
 service-debug: env db-start migrate-up searx-start kafka-start create-tasks-topic
 
 .PHONY: service-deploy
-service-deploy: env db-start migrate-up service-start workers-start searx-start kafka-start create-tasks-topic
+service-deploy: env db-start migrate-up searx-start kafka-start create-tasks-topic service-start workers-start

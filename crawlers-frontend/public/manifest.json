@@ -1,0 +1,8 @@
+{
+  "short_name": "Crawlers",
+  "name": "Search robot management system",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}

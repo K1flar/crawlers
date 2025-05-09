@@ -1,7 +1,7 @@
 package document
 
 type Document struct {
-	UUID string
+	URL  string
 	Size int64
-	TF   map[string]float64
+	TF   map[string]int64
 }

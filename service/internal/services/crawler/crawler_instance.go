@@ -2,143 +2,141 @@ package crawler
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 
-	"github.com/K1flar/crawlers/internal/business_errors"
 	"github.com/K1flar/crawlers/internal/gates"
-	"github.com/K1flar/crawlers/internal/models/source"
+	page_models "github.com/K1flar/crawlers/internal/models/page"
 	"github.com/K1flar/crawlers/internal/models/task"
-	"github.com/K1flar/crawlers/internal/services"
-	"github.com/K1flar/crawlers/internal/storage"
-	"github.com/K1flar/crawlers/utils"
-	"github.com/google/uuid"
+	"github.com/gammazero/workerpool"
+	"github.com/samber/lo"
 )
 
+type crawlerTask struct {
+	DepthLevel int
+	Page       *page_models.PageWithParentURL
+}
+
 type crawlerInstance struct {
-	task                task.Task
-	searchSystem        gates.SearchSystem
-	webScraper          gates.WebScraper
-	sourcesStorage      storage.Sources
-	collectionCollector services.CollectionCollector
-	existedSourcesByURL map[string]string
-	visited             map[string]struct{}
-	visitedLock         *sync.Mutex
-	sourcesToCreate     []sourceToCreate
-	sourcesToCreateLock *sync.Mutex
-	sourcesToUpdate     []sourceToUpdate
-	sourcesToUpdateLock *sync.Mutex
+	task         task.Task
+	webScraper   gates.WebScraper
+	wp           *workerpool.WorkerPool
+	crawlerTasks chan crawlerTask
+	stop         chan struct{}
+	pending      int64
+	pendingLock  *sync.Mutex
+	visited      map[string]struct{}
+	pages        map[string]*page_models.PageWithParentURL
 }
 
-type sourceToCreate struct {
-	UUID       string
-	Title      string
-	URL        string
-	ParentUUID *string
-}
-
-type sourceToUpdate struct {
-	UUID   string
-	Title  *string
-	Status *source.Status
-}
-
-func (c *crawlerInstance) start(ctx context.Context) error {
-	urls, err := c.searchSystem.Search(ctx, c.task.Query)
-	if err != nil {
-		return err
+func (c *crawlerInstance) start(ctx context.Context, urls []string) error {
+	if len(urls) == 0 {
+		return nil
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(urls))
+	fmt.Println("start urls: ", len(urls))
+
+	go c.crawl(ctx)
 
 	for _, url := range urls {
 		url := url
-		go func() {
-			defer wg.Done()
-			c.crawl(ctx, url, 0, nil)
-		}()
+		c.incPending()
+		c.wp.Submit(func() {
+			page, _ := c.webScraper.GetPage(ctx, url)
+
+			c.crawlerTasks <- crawlerTask{
+				DepthLevel: 1,
+				Page:       &page_models.PageWithParentURL{Page: page},
+			}
+		})
 	}
 
-	wg.Wait()
+	<-c.stop
+	c.wp.Stop()
+	close(c.crawlerTasks)
 
 	return nil
 }
 
-func (c *crawlerInstance) crawl(
-	ctx context.Context,
-	url string,
-	level int,
-	parentUUID *string,
-) error {
-	if level > c.task.DepthLevel {
-		return nil
+func (c *crawlerInstance) crawl(ctx context.Context) {
+	for task := range c.crawlerTasks {
+		c.decPending()
+
+		if task.Page == nil || task.Page.Page == nil {
+			continue
+		}
+
+		if _, visited := c.visited[task.Page.URL]; visited {
+			continue
+		}
+
+		c.visited[task.Page.URL] = struct{}{}
+		c.pages[task.Page.URL] = task.Page
+
+		if task.DepthLevel >= c.task.DepthLevel {
+			continue
+		}
+
+		if len(c.pages) > int(c.task.MaxSources) {
+			select {
+			case c.stop <- struct{}{}:
+			default:
+			}
+			continue
+		}
+
+		urls := c.filterURLs(task.Page.URLs)
+
+		if len(urls) == 0 {
+			continue
+		}
+
+		for _, url := range urls {
+			url := url
+			c.incPending()
+			c.wp.Submit(func() {
+				page, _ := c.webScraper.GetPage(ctx, url)
+
+				c.crawlerTasks <- crawlerTask{
+					DepthLevel: task.DepthLevel + 1,
+					Page: &page_models.PageWithParentURL{
+						ParentURL: &task.Page.URL,
+						Page:      page,
+					},
+				}
+			})
+		}
+
 	}
-
-	c.visitedLock.Lock()
-	if _, exists := c.visited[url]; exists {
-		c.visitedLock.Unlock()
-		return nil
-	}
-	c.visited[url] = struct{}{}
-	c.visitedLock.Unlock()
-
-	sourceUUID, sourceExists := c.existedSourcesByURL[url]
-	if !sourceExists {
-		sourceUUID = uuid.NewString()
-	}
-
-	page, err := c.webScraper.GetPage(ctx, url)
-	switch {
-	case errors.Is(err, business_errors.UnavailableSource) && sourceExists:
-		c.addPageToUpdate(sourceToUpdate{UUID: sourceUUID, Status: utils.Ptr(source.StatusUnavailable)})
-		return nil
-	case err != nil:
-		return err
-	}
-
-	if sourceExists {
-		c.addPageToUpdate(sourceToUpdate{
-			UUID:   sourceUUID,
-			Title:  &page.Title,
-			Status: utils.Ptr(source.StatusAvailable),
-		})
-	} else {
-		c.addPageToCreate(sourceToCreate{
-			UUID:       sourceUUID,
-			Title:      page.Title,
-			URL:        url,
-			ParentUUID: parentUUID,
-		})
-	}
-
-	c.collectionCollector.AddPage(sourceUUID, page)
-
-	wg := &sync.WaitGroup{}
-
-	wg.Add(len(page.URLs))
-
-	for _, url := range page.URLs {
-		url := url
-		go func() {
-			defer wg.Done()
-			c.crawl(ctx, url, level+1, &sourceUUID)
-		}()
-	}
-
-	wg.Wait()
-
-	return nil
 }
 
-func (c *crawlerInstance) addPageToCreate(page sourceToCreate) {
-	c.sourcesToCreateLock.Lock()
-	c.sourcesToCreate = append(c.sourcesToCreate, page)
-	c.sourcesToCreateLock.Unlock()
+func (c *crawlerInstance) filterURLs(urls []string) []string {
+	notVisited := lo.Filter(urls, func(url string, _ int) bool {
+		_, visited := c.visited[url]
+		return !visited
+	})
+
+	if len(notVisited) > int(c.task.MaxNeighboursForSource) {
+		notVisited = notVisited[:c.task.MaxNeighboursForSource]
+	}
+
+	return notVisited
 }
 
-func (c *crawlerInstance) addPageToUpdate(page sourceToUpdate) {
-	c.sourcesToUpdateLock.Lock()
-	c.sourcesToUpdate = append(c.sourcesToUpdate, page)
-	c.sourcesToUpdateLock.Unlock()
+func (c *crawlerInstance) incPending() {
+	c.pendingLock.Lock()
+	c.pending++
+	c.pendingLock.Unlock()
+}
+
+func (c *crawlerInstance) decPending() {
+	c.pendingLock.Lock()
+	c.pending--
+	if c.pending == 0 {
+		select {
+		case c.stop <- struct{}{}:
+		default:
+		}
+	}
+	c.pendingLock.Unlock()
 }
