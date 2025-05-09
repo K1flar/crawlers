@@ -116,7 +116,7 @@ const ProtocolPage = () => {
       dataIndex: 'duration',
       key: 'duration',
       render: (duration) => duration ? formatDuration(duration) : '-',
-      width: 120,
+      width: 130,
     },
     {
       title: 'Статус запуска',
