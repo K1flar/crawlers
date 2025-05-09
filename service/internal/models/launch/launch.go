@@ -9,8 +9,9 @@ type Status string
 type ErrorSlug string
 
 const (
-	StatusInProgress = "in_progress"
-	StatusFinished   = "finished"
+	StatusInProgress Status = "in_progress"
+	StatusFinished   Status = "finished"
+	StatusFailed     Status = "failed"
 )
 
 type Launch struct {

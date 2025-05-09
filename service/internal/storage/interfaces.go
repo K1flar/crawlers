@@ -11,6 +11,7 @@ import (
 type Tasks interface {
 	GetByID(ctx context.Context, id int64) (task.Task, error)
 	GetForList(ctx context.Context, filter FilterTaskForList) ([]task.ForList, error)
+	GetCount(ctx context.Context) (int64, error)
 	FindInStatuses(ctx context.Context, statuses []task.Status) ([]task.Task, error)
 	Create(ctx context.Context, params ToCreateTask) (int64, error)
 	SetStatus(ctx context.Context, id int64, status task.Status) error

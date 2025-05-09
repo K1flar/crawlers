@@ -93,23 +93,51 @@ func (s *Storage) GetByID(ctx context.Context, id int64) (task.Task, error) {
 func (s *Storage) GetForList(ctx context.Context, filter storage.FilterTaskForList) ([]task.ForList, error) {
 	var res []taskForListPG
 
-	q := pgSql.
-		Select("t.id", "t.query", "t.status", "count(txs.source_id) as count_sources").
+	// Подзапрос для получения последнего launch_id для каждой задачи
+	lastLaunchSubquery := pgSql.
+		Select(
+			"task_id",
+			"MAX(launch_id) as last_launch_id",
+		).
+		From("tasks_x_sources").
+		GroupBy("task_id").
+		Prefix("WITH last_launches AS (").
+		Suffix(")")
+
+	// Основной запрос
+	query := pgSql.
+		Select(
+			"t.id",
+			"t.query",
+			"t.status",
+			"COUNT(DISTINCT txs.source_id) AS count_sources",
+		).
 		From("tasks t").
-		Join("tasks_x_sources txs ON t.id = txs.task_id").
+		LeftJoin("last_launches ll ON ll.task_id = t.id").
+		LeftJoin("tasks_x_sources txs ON txs.task_id = t.id AND txs.launch_id = ll.last_launch_id").
 		GroupBy("t.id")
 
 	if filter.Status != nil {
-		q = q.Where(squirrel.Eq{"t.status": *filter.Status})
+		query = query.Where(squirrel.Eq{"t.status": *filter.Status})
 	}
 
 	if filter.Query != nil {
-		q = q.Where(squirrel.Like{"t.query": fmt.Sprintf("%%%s%%", *filter.Query)})
+		query = query.Where(squirrel.ILike{"t.query": fmt.Sprintf("%%%s%%", *filter.Query)})
 	}
 
-	sql, args := q.Limit(uint64(filter.Limit)).
-		Offset(uint64(filter.Offset)).
-		MustSql()
+	if filter.Limit > 0 {
+		query = query.Limit(uint64(filter.Limit))
+	}
+
+	if filter.Offset > 0 {
+		query = query.Offset(uint64(filter.Offset))
+	}
+
+	query = query.OrderBy("t.id DESC")
+
+	fullQuery := lastLaunchSubquery.SuffixExpr(query)
+
+	sql, args := fullQuery.MustSql()
 
 	err := s.db.SelectContext(ctx, &res, sql, args...)
 
@@ -121,6 +149,19 @@ func (s *Storage) GetForList(ctx context.Context, filter storage.FilterTaskForLi
 			CountSources: pg.CountSources,
 		}
 	}), err
+}
+
+func (s *Storage) GetCount(ctx context.Context) (int64, error) {
+	var count int64
+
+	sql, args := pgSql.
+		Select("count(*)").
+		From(tasksTbl).
+		MustSql()
+
+	err := s.db.QueryRowContext(ctx, sql, args...).Scan(&count)
+
+	return count, err
 }
 
 func (s *Storage) FindInStatuses(ctx context.Context, statuses []task.Status) ([]task.Task, error) {

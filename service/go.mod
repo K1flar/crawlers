@@ -17,6 +17,8 @@ require (
 )
 
 require (
+	github.com/PuerkitoBio/goquery v1.10.3 // indirect
+	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/gammazero/deque v0.2.0 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250417205406-170dfdcf87d1 // indirect
@@ -27,8 +29,8 @@ require (
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
-	golang.org/x/net v0.37.0 // indirect
-	golang.org/x/sync v0.13.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/sync v0.14.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.25.0 // indirect
 )

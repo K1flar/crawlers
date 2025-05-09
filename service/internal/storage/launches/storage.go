@@ -94,7 +94,7 @@ func (s *Storage) Finish(ctx context.Context, params storage.ToFinishLaunch) err
 		SetMap(map[string]any{
 			finishedAtCol:    params.FinishedAt,
 			sourcesViewedCol: params.SourcesViewed,
-			statusCol:        launch.StatusFinished,
+			statusCol:        params.Status,
 			errorCol:         params.Error,
 		}).
 		Where(squirrel.Eq{idCol: params.ID}).

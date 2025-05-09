@@ -10,6 +10,7 @@ import (
 	"github.com/K1flar/crawlers/internal/storage"
 	"github.com/K1flar/crawlers/internal/utils"
 	"github.com/samber/lo"
+	"golang.org/x/sync/errgroup"
 )
 
 type Handler struct {
@@ -34,6 +35,7 @@ type dtoRequest struct {
 
 type dtoResponse struct {
 	Tasks []dtoTask `json:"tasks"`
+	Total int64     `json:"total"`
 }
 
 type dtoTask struct {
@@ -46,7 +48,11 @@ type dtoTask struct {
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var err error
+	var (
+		err   error
+		tasks []task.ForList
+		count int64
+	)
 
 	defer func() {
 		if err != nil {
@@ -65,12 +71,26 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		query = utils.Ptr(strings.ToLower(strings.Trim(*dto.Query, " ")))
 	}
 
-	tasks, err := h.tasks.GetForList(ctx, storage.FilterTaskForList{
-		Limit:  dto.Limit,
-		Offset: dto.Offset,
-		Status: (*task.Status)(dto.Status),
-		Query:  query,
+	errGrp, gCtx := errgroup.WithContext(ctx)
+
+	errGrp.Go(func() error {
+		tasks, err = h.tasks.GetForList(gCtx, storage.FilterTaskForList{
+			Limit:  dto.Limit,
+			Offset: dto.Offset,
+			Status: (*task.Status)(dto.Status),
+			Query:  query,
+		})
+
+		return err
 	})
+
+	errGrp.Go(func() error {
+		count, err = h.tasks.GetCount(gCtx)
+
+		return err
+	})
+
+	err = errGrp.Wait()
 	if err != nil {
 		common.Error(w, err)
 		return
@@ -85,5 +105,6 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 				CountSources: task.CountSources,
 			}
 		}),
+		Total: count,
 	})
 }

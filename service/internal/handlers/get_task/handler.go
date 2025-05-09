@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/K1flar/crawlers/internal/handlers/common"
-	"github.com/K1flar/crawlers/internal/models/launch"
 	task_model "github.com/K1flar/crawlers/internal/models/task"
 	"github.com/K1flar/crawlers/internal/storage"
 	"github.com/K1flar/crawlers/internal/utils"
@@ -38,7 +37,7 @@ type dtoResponse struct {
 	ProcessedAt            *time.Time     `json:"processedAt"`
 	SourcesViewed          *int64         `json:"sourcesViewed"`
 	LaunchDuration         *time.Duration `json:"launchDuration"`
-	ErrorMsg               *string        `json:"errorSlug"`
+	ErrorMsg               *string        `json:"errorMsg"`
 	DepthLevel             int            `json:"depthLevel"`
 	MinWeight              float64        `json:"minWeight"`
 	MaxSources             int64          `json:"maxSources"`
@@ -80,9 +79,8 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		MaxNeighboursForSource: task.MaxNeighboursForSource,
 	}
 
-	var launch launch.Launch
-	if task.Status != task_model.StatusCreated {
-		launch, err = h.launches.GetLastByTaskID(ctx, dto.ID)
+	if task.Status != task_model.StatusCreated && task.Status != task_model.StatusInPocessing {
+		launch, err := h.launches.GetLastByTaskID(ctx, dto.ID)
 		if err != nil {
 			common.Error(w, err)
 			return

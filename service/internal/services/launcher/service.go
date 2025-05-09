@@ -53,10 +53,16 @@ func (s *Service) Start(ctx context.Context, taskID int64) (int64, error) {
 }
 
 func (s *Service) Finish(ctx context.Context, params services.LaunhToFinishParams) error {
+	status := launch.StatusFinished
+	if params.Error != nil {
+		status = launch.StatusFailed
+	}
+
 	err := s.launches.Finish(ctx, storage.ToFinishLaunch{
 		ID:            params.LaunchID,
 		FinishedAt:    s.now(),
 		SourcesViewed: int64(len(params.Pages)),
+		Status:        status,
 		Error:         launch.ErrorToSlug(params.Error),
 	})
 	if err != nil {

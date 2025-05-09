@@ -67,17 +67,17 @@ func (s *Story) Process(ctx context.Context, id int64) error {
 		newStatus = task_model.StatusStoppedWithError
 	}
 
-	err = s.tasksStorage.SetStatus(ctx, id, newStatus)
-	if err != nil {
-		return err
-	}
-
 	err = s.launcher.Finish(ctx, services.LaunhToFinishParams{
 		LaunchID: launchID,
 		Task:     task,
 		Pages:    pages,
 		Error:    crawlerErr,
 	})
+
+	err = s.tasksStorage.SetStatus(ctx, id, newStatus)
+	if err != nil {
+		return err
+	}
 
 	return err
 }

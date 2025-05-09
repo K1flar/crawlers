@@ -11,6 +11,7 @@ import (
 	api_get_protocol "github.com/K1flar/crawlers/internal/handlers/get_protocol"
 	api_get_sources "github.com/K1flar/crawlers/internal/handlers/get_sources"
 	api_get_task "github.com/K1flar/crawlers/internal/handlers/get_task"
+	api_get_task_status "github.com/K1flar/crawlers/internal/handlers/get_task_status"
 	api_get_tasks "github.com/K1flar/crawlers/internal/handlers/get_tasks"
 	api_stop_task "github.com/K1flar/crawlers/internal/handlers/stop_task"
 	api_update_task "github.com/K1flar/crawlers/internal/handlers/update_task"
@@ -85,6 +86,7 @@ func main() {
 
 	mux.Handle("POST /create-task", corsMW(http.HandlerFunc(api_create_task.New(log, createTaskStory).Handle)))
 	mux.Handle("POST /get-task", corsMW(http.HandlerFunc(api_get_task.New(log, tasksStorage, launchesStorage).Handle)))
+	mux.Handle("POST /get-task-status", corsMW(http.HandlerFunc(api_get_task_status.New(log, tasksStorage).Handle)))
 	mux.Handle("POST /get-sources", corsMW(http.HandlerFunc(api_get_sources.New(log, sourcesStorage).Handle)))
 	mux.Handle("POST /stop-task", corsMW(http.HandlerFunc(api_stop_task.New(log, tasksStorage).Handle)))
 	mux.Handle("POST /activate-task", corsMW(http.HandlerFunc(api_activate_task.New(log, tasksStorage, producerTasksToProcess).Handle)))

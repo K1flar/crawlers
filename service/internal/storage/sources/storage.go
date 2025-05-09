@@ -226,7 +226,15 @@ func (s *Storage) GetForProtocol(ctx context.Context, filter storage.FilterForPr
 		q = q.Where(squirrel.Like{"s.status": fmt.Sprintf("%%%s%%", *filter.SourceStatus)})
 	}
 
-	sql, args := q.Limit(uint64(filter.Limit)).Offset(uint64(filter.Offset)).MustSql()
+	if filter.Limit > 0 {
+		q = q.Limit(uint64(filter.Limit))
+	}
+
+	if filter.Offset > 0 {
+		q = q.Limit(uint64(filter.Offset))
+	}
+
+	sql, args := q.MustSql()
 
 	err := s.db.SelectContext(ctx, &res, sql, args...)
 

@@ -64,6 +64,7 @@ type ToFinishLaunch struct {
 	ID            int64
 	FinishedAt    time.Time
 	SourcesViewed int64
+	Status        launch.Status
 	Error         *launch.ErrorSlug
 }
 
