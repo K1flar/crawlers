@@ -8,11 +8,11 @@ const (
 )
 
 type Page struct {
-	URL    string
-	Status Status
-	Title  string
-	Body   string
-	URLs   []string
+	URL     string
+	Status  Status
+	Title   string
+	Content string
+	URLs    []string
 }
 
 type PageWithParentURL struct {

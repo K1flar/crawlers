@@ -6,7 +6,6 @@ import (
 
 	"github.com/K1flar/crawlers/internal/models/document"
 	"github.com/K1flar/crawlers/internal/models/page"
-	"github.com/PuerkitoBio/goquery"
 	"github.com/samber/lo"
 )
 
@@ -37,7 +36,7 @@ func New(q string) *Service {
 }
 
 func (s *Service) AddPage(url string, page page.Page) {
-	words := strings.Fields(extractText(page.Body))
+	words := strings.Fields(page.Content)
 	docLength := int64(len(words))
 
 	tf := make(map[string]int64, len(s.terms))
@@ -86,13 +85,4 @@ func (s *Service) BM25(url string) (float64, bool) {
 	}
 
 	return bm25, true
-}
-
-func extractText(html string) string {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err != nil {
-		return html
-	}
-
-	return doc.Text()
 }
