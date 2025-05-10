@@ -7,6 +7,7 @@ import (
 	"time"
 
 	page_models "github.com/K1flar/crawlers/internal/models/page"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 	"github.com/samber/lo"
@@ -41,7 +42,10 @@ func (g *Gate) GetPage(ctx context.Context, url string) (*page_models.Page, erro
 		Status: page_models.StatusUnavailable,
 	}
 
-	var urls []string
+	var (
+		content string
+		urls    []string
+	)
 
 	actions := []chromedp.Action{
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -58,7 +62,7 @@ func (g *Gate) GetPage(ctx context.Context, url string) (*page_models.Page, erro
 		}),
 		chromedp.Navigate(url),
 		chromedp.Title(&page.Title),
-		chromedp.OuterHTML("html", &page.Body),
+		chromedp.OuterHTML("html", &content),
 		// Получаем текущий URL (может отличаться от исходного из-за редиректов)
 		chromedp.Location(&page.URL),
 		chromedp.Evaluate(`
@@ -76,6 +80,16 @@ func (g *Gate) GetPage(ctx context.Context, url string) (*page_models.Page, erro
 	})
 
 	page.URLs = filteredURLs
+	page.Content = extractText(content)
 
 	return page, nil
+}
+
+func extractText(html string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return html
+	}
+
+	return doc.Text()
 }
