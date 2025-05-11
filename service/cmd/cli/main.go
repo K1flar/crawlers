@@ -77,9 +77,9 @@ func main() {
 		maxCountCrawlersInt = defaulCountCrawlers
 	}
 
-	tasksToProcessPeriod, err := time.ParseDuration(cronTasksToProcessPeriod)
+	tasksToProcessPeriod, err := time.ParseDuration(os.Getenv(cronTasksToProcessPeriod))
 	if err != nil {
-		log.Warn(fmt.Sprintf("failed to parse cron tasks to process producer period: [%s]", os.Getenv(cronTasksToProcessPeriod)))
+		log.Warn(fmt.Sprintf("failed to parse cron tasks to process producer period: [%s]: %s", os.Getenv(cronTasksToProcessPeriod), err))
 
 		tasksToProcessPeriod = defaultTasksToProcessPeriod
 	}
