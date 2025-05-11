@@ -13,6 +13,7 @@ import {
 } from 'antd';
 import { SearchOutlined, LinkOutlined, FileExcelOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
+import dayjs from 'dayjs';
 
 const { Text } = Typography;
 
@@ -71,14 +72,14 @@ const ProtocolPage = () => {
       title: 'Создан',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (date) => new Date(date).toLocaleString(),
+      render: (date) => prepareDate(date),
       width: 170,
     },
     {
       title: 'Обновлен',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      render: (date) => new Date(date).toLocaleString(),
+      render: (date) =>prepareDate(date),
       width: 170,
     },
     {
@@ -108,7 +109,7 @@ const ProtocolPage = () => {
       title: 'Время запуска',
       dataIndex: 'startedAt',
       key: 'startedAt',
-      render: (date) => new Date(date).toLocaleString(),
+      render: (date) => prepareDate(date),
       width: 170,
     },
     {
@@ -322,12 +323,12 @@ const exportToExcel = async (payload) => {
     'ID источника': item.sourceId,
     'Название источника': item.title,
     'URL источника': item.url,
-    'Создан': new Date(item.createdAt).toLocaleString(),
-    'Обновлен': new Date(item.updatedAt).toLocaleString(),
+    'Создан': prepareDate(item.createdAt),
+    'Обновлен': prepareDate(item.updatedAt),
     'Статус источника': item.sourceStatus === 'available' ? 'Доступен' : 'Недоступен',
     'ID запуска': item.launchId,
     'Номер запуска': item.launchNumber,
-    'Время запуска': new Date(item.startedAt).toLocaleString(),
+    'Время запуска': prepareDate(item.startedAt),
     'Длительность': item.duration ? formatDuration(item.duration) : '-',
     'Статус запуска': item.launchStatus === 'finished' ? 'Завершен' :
       item.launchStatus === 'failed' ? 'Ошибка' :
@@ -364,6 +365,10 @@ const formatDuration = function(duration) {
   }
 
   return parts.join(' ');
+}
+
+function prepareDate(utcString) {
+ return dayjs.utc(utcString).format('DD.MM.YYYY HH:mm')
 }
 
 export default ProtocolPage;
